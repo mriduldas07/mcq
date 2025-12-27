@@ -111,22 +111,22 @@ export default async function DashboardPage() {
     const averageScore = avgScore._avg.score || 0;
 
     return (
-        <div className="flex-1 space-y-6 p-8 pt-6">
+        <div className="flex-1 space-y-4 sm:space-y-6">
             {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h2 className="text-3xl font-bold tracking-tight">Teacher Dashboard</h2>
-                    <p className="text-muted-foreground">Welcome back! Here's what's happening with your exams.</p>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="space-y-1">
+                    <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Teacher Dashboard</h2>
+                    <p className="text-sm sm:text-base text-muted-foreground">Welcome back! Here's what's happening with your exams.</p>
                 </div>
-                <Link href="/dashboard/exams/create">
-                    <Button size="lg">
-                        <Plus className="mr-2 h-5 w-5" /> Create Exam
+                <Link href="/dashboard/exams/create" className="w-full sm:w-auto">
+                    <Button size="lg" className="w-full sm:w-auto">
+                        <Plus className="mr-2 h-4 w-4 sm:h-5 sm:w-5" /> Create Exam
                     </Button>
                 </Link>
             </div>
 
             {/* Statistics Grid */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Total Exams</CardTitle>
@@ -134,7 +134,7 @@ export default async function DashboardPage() {
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{totalExams}</div>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground mt-1">
                             <Badge variant="outline" className="text-xs">{publishedExams} Published</Badge>
                             <Badge variant="secondary" className="text-xs">{draftExams} Draft</Badge>
                         </div>
@@ -182,7 +182,7 @@ export default async function DashboardPage() {
             </div>
 
             {/* Secondary Stats */}
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Total Questions</CardTitle>
@@ -227,44 +227,60 @@ export default async function DashboardPage() {
 
             {/* Recent Activity */}
             <Card>
-                <CardHeader>
-                    <CardTitle>Recent Exam Submissions</CardTitle>
-                    <CardDescription>Latest completed attempts from students</CardDescription>
+                <CardHeader className="space-y-1">
+                    <CardTitle className="text-lg sm:text-xl">Recent Exam Submissions</CardTitle>
+                    <CardDescription className="text-xs sm:text-sm">Latest completed attempts from students</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="px-4 sm:px-6">
                     {recentAttempts.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-8 text-center">
                             <AlertCircle className="h-10 w-10 text-muted-foreground mb-2" />
                             <p className="text-sm text-muted-foreground">No submissions yet</p>
                         </div>
                     ) : (
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                             {recentAttempts.map((attempt: RecentAttempt) => (
-                                <div key={attempt.id} className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0">
-                                    <div className="space-y-1">
-                                        <p className="text-sm font-medium leading-none">
-                                            {attempt.studentName} ({attempt.rollNumber})
-                                        </p>
-                                        <p className="text-sm text-muted-foreground">
+                                <div key={attempt.id} className="flex items-center justify-between gap-4 p-3 rounded-lg border hover:bg-accent/50 transition-colors">
+                                    <div className="min-w-0 flex-1 space-y-1">
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-sm font-medium truncate">
+                                                {attempt.studentName}
+                                            </p>
+                                            <span className="text-xs text-muted-foreground shrink-0">
+                                                ({attempt.rollNumber})
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground truncate">
                                             {attempt.exam.title}
                                         </p>
                                     </div>
-                                    <div className="flex items-center gap-4">
-                                        {attempt.violations > 0 && (
-                                            <Badge variant="destructive" className="gap-1">
-                                                <Shield className="h-3 w-3" />
-                                                {attempt.violations} violations
-                                            </Badge>
-                                        )}
-                                        <div className="text-right">
-                                            <div className="text-sm font-bold">{attempt.score}%</div>
-                                            <div className="text-xs text-muted-foreground">
+                                    
+                                    <div className="flex items-center gap-3 shrink-0">
+                                        <div className="hidden sm:flex items-center gap-3">
+                                            {attempt.violations > 0 && (
+                                                <Badge variant="destructive" className="gap-1">
+                                                    <Shield className="h-3 w-3" />
+                                                    {attempt.violations}
+                                                </Badge>
+                                            )}
+                                            <span className="text-xs text-muted-foreground whitespace-nowrap">
                                                 {attempt.completedAt ? new Date(attempt.completedAt).toLocaleDateString() : 'N/A'}
-                                            </div>
+                                            </span>
                                         </div>
+                                        
+                                        <div className="text-right min-w-[3rem]">
+                                            <div className="text-lg font-bold">{attempt.score}%</div>
+                                            {attempt.violations > 0 && (
+                                                <div className="sm:hidden text-xs text-destructive font-medium">
+                                                    ⚠ {attempt.violations}
+                                                </div>
+                                            )}
+                                        </div>
+                                        
                                         <Link href={`/dashboard/results/${attempt.examId}`}>
-                                            <Button variant="ghost" size="sm">
+                                            <Button variant="ghost" size="sm" className="h-9 w-9 p-0">
                                                 <Eye className="h-4 w-4" />
+                                                <span className="sr-only">View details</span>
                                             </Button>
                                         </Link>
                                     </div>
@@ -274,7 +290,7 @@ export default async function DashboardPage() {
                     )}
                 </CardContent>
                 {recentAttempts.length > 0 && (
-                    <CardFooter>
+                    <CardFooter className="px-4 sm:px-6">
                         <Link href="/dashboard/exams" className="w-full">
                             <Button variant="outline" className="w-full">
                                 View All Exams & Results

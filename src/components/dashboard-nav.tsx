@@ -34,7 +34,7 @@ const items = [
     },
 ];
 
-export function DashboardNav() {
+export function DashboardNav({ onNavigate }: { onNavigate?: () => void }) {
     const pathname = usePathname();
 
     return (
@@ -45,6 +45,7 @@ export function DashboardNav() {
                     <Link
                         key={index}
                         href={item.href}
+                        onClick={onNavigate}
                     >
                         <span
                             className={cn(
@@ -60,7 +61,11 @@ export function DashboardNav() {
             })}
 
             <form action={logoutAction}>
-                <button className="w-full text-left group flex items-center rounded-md px-3 py-2 text-sm font-medium hover:bg-red-100 text-red-600">
+                <button 
+                    type="submit"
+                    onClick={onNavigate}
+                    className="w-full text-left group flex items-center rounded-md px-3 py-2 text-sm font-medium hover:bg-red-100 text-red-600"
+                >
                     <span className="mr-2">🚪</span> Logout
                 </button>
             </form>
