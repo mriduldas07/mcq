@@ -1,0 +1,134 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String?   // Nullable for magic links or OAuth later
+  name          String?
+  planType      PlanType  @default(FREE)
+  credits       Int       @default(0) // For Pay-Per-Exam
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  exams         Exam[]
+  payments      Payment[]
+}
+
+enum PlanType {
+  FREE
+  PRO
+}
+
+model Exam {
+  id              String      @id @default(cuid())
+  title           String
+  description     String?
+  duration        Int         // Duration in minutes
+  teacherId       String
+  teacher         User        @relation(fields: [teacherId], references: [id])
+  status          ExamStatus  @default(DRAFT)
+  priceMode       PriceMode   @default(FREE)
+  
+  // Anti-cheat settings
+  antiCheatEnabled Boolean    @default(true)  // Enable/disable anti-cheat
+  maxViolations   Int         @default(3)      // Max violations before auto-submit
+  
+  // Scheduling settings
+  scheduledStartTime DateTime?  // When exam becomes available
+  scheduledEndTime   DateTime?  // When exam closes
+  allowLateSubmission Boolean  @default(false)  // Allow submission after end time
+  
+  // Grading settings
+  passPercentage  Int         @default(50)     // Minimum percentage to pass
+  shuffleQuestions Boolean    @default(false)  // Randomize question order
+  shuffleOptions   Boolean    @default(false)  // Randomize option order
+  showResultsImmediately Boolean @default(true) // Show results after submission
+  
+  // Access control
+  requirePassword Boolean     @default(false)  // Require password to access
+  examPassword    String?                      // Exam access password
+  maxAttempts     Int?                         // Max attempts per student (null = unlimited)
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  questions   Question[]
+  attempts    StudentAttempt[]
+}
+
+enum ExamStatus {
+  DRAFT
+  PUBLISHED
+  ENDED
+}
+
+enum PriceMode {
+  FREE
+  PAID_BY_TEACHER // Teacher pays, student free
+}
+
+model Question {
+  id            String   @id @default(cuid())
+  examId        String
+  exam          Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  text          String   // Rich text content
+  options       Json     // Array of option objects { id: string, text: string }
+  correctOption String   // ID of the correct option
+  marks         Int      @default(1)
+  timeLimit     Int?     // Optional per-question timer in seconds
+  createdAt     DateTime @default(now())
+}
+
+model StudentAttempt {
+  id            String    @id @default(cuid())
+  examId        String
+  exam          Exam      @relation(fields: [examId], references: [id], onDelete: Cascade)
+  studentName   String
+  rollNumber    String?
+  startTime     DateTime? // When exam actually started (server time)
+  endTime       DateTime? // Calculated deadline (server time)
+  startedAt     DateTime  @default(now())
+  completedAt   DateTime?
+  submitted     Boolean   @default(false)
+  score         Int       @default(0)
+  totalQuestions Int      @default(0)  // Total number of questions
+  correctAnswers Int      @default(0)  // Number of correct answers
+  wrongAnswers   Int      @default(0)  // Number of wrong answers
+  unanswered     Int      @default(0)  // Number of unanswered questions
+  answers       Json      // Stored answers { questionId: optionId }
+  violations    Int       @default(0)  // TASK 6: Track tab switches, window blur, etc.
+  trustScore    Int       @default(100)
+  createdAt     DateTime  @default(now())
+}
+
+model Payment {
+  id        String        @id @default(cuid())
+  teacherId String
+  teacher   User          @relation(fields: [teacherId], references: [id])
+  amount    Int           // Amount in cents
+  currency  String        @default("USD")
+  status    PaymentStatus @default(PENDING)
+  type      PaymentType
+  createdAt DateTime      @default(now())
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum PaymentType {
+  SUBSCRIPTION
+  CREDIT_PURCHASE
+}
