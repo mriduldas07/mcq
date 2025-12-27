@@ -346,7 +346,7 @@ export async function duplicateExamAction(examId: string) {
                 questions: {
                     create: exam.questions.map(q => ({
                         text: q.text,
-                        options: q.options,
+                        options: q.options as any,
                         correctOption: q.correctOption,
                         marks: q.marks,
                         timeLimit: q.timeLimit,
