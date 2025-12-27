@@ -59,6 +59,24 @@ export async function createExamAction(formData: FormData) {
     if (maxAttempts !== null && (isNaN(maxAttempts) || maxAttempts < 1)) {
         throw new Error("Max attempts must be a positive number");
     }
+    
+    // Scheduling settings
+    const scheduledStartTimeStr = formData.get("scheduledStartTime") as string | null;
+    const scheduledStartTime = scheduledStartTimeStr && scheduledStartTimeStr.trim() !== "" 
+        ? new Date(scheduledStartTimeStr) 
+        : null;
+    
+    const scheduledEndTimeStr = formData.get("scheduledEndTime") as string | null;
+    const scheduledEndTime = scheduledEndTimeStr && scheduledEndTimeStr.trim() !== "" 
+        ? new Date(scheduledEndTimeStr) 
+        : null;
+    
+    const allowLateSubmission = formData.get("allowLateSubmission") === "true";
+    
+    // Validate scheduling times
+    if (scheduledStartTime && scheduledEndTime && scheduledStartTime >= scheduledEndTime) {
+        throw new Error("End time must be after start time");
+    }
 
     let examId = "";
 
@@ -81,6 +99,9 @@ export async function createExamAction(formData: FormData) {
             requirePassword,
             examPassword: examPassword ? "[SET]" : null,
             maxAttempts,
+            scheduledStartTime,
+            scheduledEndTime,
+            allowLateSubmission,
         });
 
         const exam = await prisma.exam.create({
@@ -99,6 +120,9 @@ export async function createExamAction(formData: FormData) {
                 requirePassword,
                 examPassword: requirePassword && examPassword ? examPassword : null,
                 maxAttempts,
+                scheduledStartTime,
+                scheduledEndTime,
+                allowLateSubmission,
             },
         });
         examId = exam.id;

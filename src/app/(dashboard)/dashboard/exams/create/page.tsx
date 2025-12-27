@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { createExamAction } from "@/actions/exam";
 import Link from "next/link";
-import { Shield, Clock, Settings, Lock, Target, Shuffle } from "lucide-react";
+import { Shield, Clock, Settings, Lock, Target, Shuffle, Calendar, Info } from "lucide-react";
 
 export default function CreateExamPage() {
     return (
@@ -79,8 +79,24 @@ export default function CreateExamPage() {
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="maxViolations">Max Violations Before Auto-Submit</Label>
-                            <Input id="maxViolations" name="maxViolations" type="number" min="1" max="10" defaultValue="3" />
+                            <div className="flex items-center gap-2">
+                                <Input id="maxViolations" name="maxViolations" type="number" min="1" max="10" defaultValue="3" className="max-w-[120px]" />
+                                <span className="text-sm text-muted-foreground">violations</span>
+                            </div>
                             <p className="text-xs text-muted-foreground">Number of violations allowed before exam is automatically submitted</p>
+                        </div>
+                        <div className="p-3 bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-200 dark:border-red-800">
+                            <div className="flex gap-2">
+                                <Shield className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                                <div className="text-sm text-red-900 dark:text-red-100">
+                                    <p className="font-medium mb-1">Anti-Cheat Monitors:</p>
+                                    <ul className="list-disc list-inside space-y-1 text-red-800 dark:text-red-200">
+                                        <li>Tab switching or leaving the exam window</li>
+                                        <li>Window blur or focus loss events</li>
+                                        <li>All violations are logged with timestamps</li>
+                                    </ul>
+                                </div>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
@@ -99,7 +115,10 @@ export default function CreateExamPage() {
                     <CardContent className="space-y-4">
                         <div className="space-y-2">
                             <Label htmlFor="passPercentage">Pass Percentage</Label>
-                            <Input id="passPercentage" name="passPercentage" type="number" min="0" max="100" defaultValue="50" />
+                            <div className="flex items-center gap-2">
+                                <Input id="passPercentage" name="passPercentage" type="number" min="0" max="100" defaultValue="50" className="max-w-[120px]" />
+                                <span className="text-sm text-muted-foreground">%</span>
+                            </div>
                             <p className="text-xs text-muted-foreground">Minimum percentage required to pass the exam</p>
                         </div>
                         <div className="flex items-center justify-between">
@@ -108,6 +127,19 @@ export default function CreateExamPage() {
                                 <p className="text-sm text-muted-foreground">Display scores and answers right after submission</p>
                             </div>
                             <input type="checkbox" id="showResultsImmediately" name="showResultsImmediately" value="true" defaultChecked className="h-4 w-4" />
+                        </div>
+                        <div className="p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                            <div className="flex gap-2">
+                                <Info className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                                <div className="text-sm text-amber-900 dark:text-amber-100">
+                                    <p className="font-medium mb-1">Grading Tips:</p>
+                                    <ul className="list-disc list-inside space-y-1 text-amber-800 dark:text-amber-200">
+                                        <li>Common pass percentages: 40% (pass), 50% (credit), 70% (distinction)</li>
+                                        <li>Disable immediate results to prevent answer sharing during exam window</li>
+                                        <li>You can always view individual student results in the dashboard</li>
+                                    </ul>
+                                </div>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
@@ -138,6 +170,74 @@ export default function CreateExamPage() {
                             </div>
                             <input type="checkbox" id="shuffleOptions" name="shuffleOptions" value="true" className="h-4 w-4" />
                         </div>
+                        <div className="p-3 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800">
+                            <div className="flex gap-2">
+                                <Shuffle className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                                <div className="text-sm text-green-900 dark:text-green-100">
+                                    <p className="font-medium mb-1">Why Randomize?</p>
+                                    <ul className="list-disc list-inside space-y-1 text-green-800 dark:text-green-200">
+                                        <li>Reduces cheating in online environments</li>
+                                        <li>Each student gets a unique exam experience</li>
+                                        <li>Recommended for large classes or remote exams</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Scheduling */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <Calendar className="h-5 w-5" />
+                            Scheduling
+                        </CardTitle>
+                        <CardDescription>
+                            Control when the exam is available to students
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="scheduledStartTime">Start Date & Time</Label>
+                                <Input 
+                                    id="scheduledStartTime" 
+                                    name="scheduledStartTime" 
+                                    type="datetime-local"
+                                />
+                                <p className="text-xs text-muted-foreground">Leave empty for immediate availability</p>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="scheduledEndTime">End Date & Time</Label>
+                                <Input 
+                                    id="scheduledEndTime" 
+                                    name="scheduledEndTime" 
+                                    type="datetime-local"
+                                />
+                                <p className="text-xs text-muted-foreground">Leave empty for no deadline</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                                <Label htmlFor="allowLateSubmission">Allow Late Submission</Label>
+                                <p className="text-sm text-muted-foreground">Students can submit after the end time</p>
+                            </div>
+                            <input type="checkbox" id="allowLateSubmission" name="allowLateSubmission" value="true" className="h-4 w-4" />
+                        </div>
+                        <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                            <div className="flex gap-2">
+                                <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                                <div className="text-sm text-blue-900 dark:text-blue-100">
+                                    <p className="font-medium mb-1">Scheduling Tips:</p>
+                                    <ul className="list-disc list-inside space-y-1 text-blue-800 dark:text-blue-200">
+                                        <li>Set both start and end times for timed windows</li>
+                                        <li>Leave both empty for always-available exams</li>
+                                        <li>Enable late submission for flexibility with penalties</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
                     </CardContent>
                 </Card>
 
@@ -163,11 +263,28 @@ export default function CreateExamPage() {
                         <div className="space-y-2">
                             <Label htmlFor="examPassword">Exam Password</Label>
                             <Input id="examPassword" name="examPassword" type="text" placeholder="Leave empty if no password required" />
+                            <p className="text-xs text-muted-foreground">Share this password with your students to grant access</p>
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="maxAttempts">Maximum Attempts per Student</Label>
-                            <Input id="maxAttempts" name="maxAttempts" type="number" min="1" placeholder="Leave empty for unlimited" />
+                            <div className="flex items-center gap-2">
+                                <Input id="maxAttempts" name="maxAttempts" type="number" min="1" placeholder="Unlimited" className="max-w-[200px]" />
+                                <span className="text-sm text-muted-foreground">attempts</span>
+                            </div>
                             <p className="text-xs text-muted-foreground">Limit how many times a student can attempt this exam</p>
+                        </div>
+                        <div className="p-3 bg-purple-50 dark:bg-purple-950/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                            <div className="flex gap-2">
+                                <Lock className="h-5 w-5 text-purple-600 dark:text-purple-400 flex-shrink-0 mt-0.5" />
+                                <div className="text-sm text-purple-900 dark:text-purple-100">
+                                    <p className="font-medium mb-1">Access Control Tips:</p>
+                                    <ul className="list-disc list-inside space-y-1 text-purple-800 dark:text-purple-200">
+                                        <li>Use passwords for private or proctored exams</li>
+                                        <li>Allow 2-3 attempts for practice exams</li>
+                                        <li>Limit to 1 attempt for final assessments</li>
+                                    </ul>
+                                </div>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
