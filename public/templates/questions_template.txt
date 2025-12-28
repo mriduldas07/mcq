@@ -1,0 +1,101 @@
+Sample Question Format for PDF/DOCX Import
+==========================================
+
+Q1. What is the capital of France?
+A) London
+B) Paris
+C) Berlin
+D) Madrid
+Answer: B
+Marks: 2
+Negative: 0.5
+Time: 60
+Difficulty: MEDIUM
+Explanation: Paris is the capital and largest city of France, located on the Seine River.
+
+Q2. What is 2 + 2?
+A) 3
+B) 4
+C) 5
+D) 6
+Answer: B
+Marks: 1
+Negative: 0.25
+Time: 30
+Difficulty: EASY
+Explanation: This is a basic addition problem. 2 + 2 = 4.
+
+Q3. Who wrote "Romeo and Juliet"?
+A) Charles Dickens
+B) William Shakespeare
+C) Jane Austen
+D) Mark Twain
+Answer: B
+Marks: 2
+Difficulty: MEDIUM
+Explanation: William Shakespeare wrote the famous tragedy "Romeo and Juliet" around 1594-1596.
+
+Q4. What is the chemical symbol for water?
+A) H2O
+B) CO2
+C) O2
+D) H2
+Answer: A
+Marks: 1
+Negative: 0.33
+Time: 45
+Difficulty: EASY
+Explanation: Water's chemical formula is H2O, meaning two hydrogen atoms bonded to one oxygen atom.
+
+Q5. Which planet is known as the Red Planet?
+A) Venus
+B) Jupiter
+C) Mars
+D) Saturn
+Answer: C
+Marks: 1
+Difficulty: EASY
+Explanation: Mars is called the Red Planet due to iron oxide (rust) on its surface.
+
+===========================================
+FORMAT RULES:
+===========================================
+
+1. Start each question with Q followed by a number and a period (Q1., Q2., etc.)
+
+2. Options can be formatted as:
+   - A) Option text
+   - A. Option text
+   - (A) Option text
+   - A: Option text
+
+3. Answer line must include "Answer:" followed by the letter (A, B, C, or D)
+
+4. Optional fields:
+   - Marks: (default 1)
+   - Negative: (negative marks, default 0)
+   - Time: (time limit in seconds)
+   - Difficulty: EASY, MEDIUM, or HARD (default MEDIUM)
+   - Explanation: (shown after submission)
+
+5. All optional fields are case-insensitive
+
+6. Leave blank lines between questions for better readability
+
+7. You can have 2-4 options per question (A-D)
+
+===========================================
+TIPS:
+===========================================
+
+- Keep question text clear and concise
+- Ensure only one correct answer per question
+- Use consistent formatting throughout
+- Add explanations to help students learn
+- Set appropriate time limits for complex questions
+- Use difficulty levels for analytics
+- Test with 2-3 questions before importing many
+
+===========================================
+
+Copy this format to your Word document or PDF to create your question bank!

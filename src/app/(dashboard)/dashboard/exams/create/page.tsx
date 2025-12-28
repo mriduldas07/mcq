@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -5,9 +8,81 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { createExamAction } from "@/actions/exam";
 import Link from "next/link";
-import { Shield, Clock, Settings, Lock, Target, Shuffle, Calendar, Info } from "lucide-react";
+import { Shield, Clock, Settings, Lock, Target, Shuffle, Calendar, Info, Eye, Bookmark } from "lucide-react";
+import { ExamPreviewDialog } from "@/components/exam-preview-dialog";
+import { TemplateSelectorDialog } from "@/components/template-selector-dialog";
 
 export default function CreateExamPage() {
+    const [showPreview, setShowPreview] = useState(false);
+    const [showTemplateSelector, setShowTemplateSelector] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [formData, setFormData] = useState<any>(null);
+
+    const handleFormSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const data = new FormData(form);
+        
+        // Extract data for preview
+        const previewData = {
+            title: data.get("title") as string,
+            description: data.get("description") as string,
+            duration: parseInt(data.get("duration") as string),
+            passPercentage: parseInt(data.get("passPercentage") as string),
+            antiCheatEnabled: data.get("antiCheatEnabled") === "true",
+            maxViolations: parseInt(data.get("maxViolations") as string),
+            shuffleQuestions: data.get("shuffleQuestions") === "true",
+            shuffleOptions: data.get("shuffleOptions") === "true",
+            showResultsImmediately: data.get("showResultsImmediately") === "true",
+            requirePassword: data.get("requirePassword") === "true",
+            examPassword: data.get("examPassword") as string,
+            maxAttempts: data.get("maxAttempts") ? parseInt(data.get("maxAttempts") as string) : undefined,
+            scheduledStartTime: data.get("scheduledStartTime") as string,
+            scheduledEndTime: data.get("scheduledEndTime") as string,
+            allowLateSubmission: data.get("allowLateSubmission") === "true",
+            negativeMarking: data.get("negativeMarking") === "true",
+            negativeMarks: parseFloat(data.get("negativeMarks") as string) || 0,
+            priceMode: data.get("priceMode") as string,
+        };
+        
+        setFormData(data);
+        setShowPreview(true);
+    };
+
+    const handleConfirmCreate = async () => {
+        if (!formData) return;
+        
+        setIsSubmitting(true);
+        try {
+            await createExamAction(formData);
+        } catch (error) {
+            console.error("Error creating exam:", error);
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleTemplateSelect = (template: any) => {
+        // Apply template values to form
+        const form = document.getElementById("createExamForm") as HTMLFormElement;
+        if (!form) return;
+
+        (form.elements.namedItem("duration") as HTMLInputElement).value = template.duration.toString();
+        (form.elements.namedItem("passPercentage") as HTMLInputElement).value = template.passPercentage.toString();
+        (form.elements.namedItem("antiCheatEnabled") as HTMLInputElement).checked = template.antiCheatEnabled;
+        (form.elements.namedItem("maxViolations") as HTMLInputElement).value = template.maxViolations.toString();
+        (form.elements.namedItem("shuffleQuestions") as HTMLInputElement).checked = template.shuffleQuestions;
+        (form.elements.namedItem("shuffleOptions") as HTMLInputElement).checked = template.shuffleOptions;
+        (form.elements.namedItem("showResultsImmediately") as HTMLInputElement).checked = template.showResultsImmediately;
+        (form.elements.namedItem("requirePassword") as HTMLInputElement).checked = template.requirePassword;
+        (form.elements.namedItem("allowLateSubmission") as HTMLInputElement).checked = template.allowLateSubmission;
+        (form.elements.namedItem("negativeMarking") as HTMLInputElement).checked = template.negativeMarking;
+        (form.elements.namedItem("negativeMarks") as HTMLInputElement).value = template.negativeMarks.toString();
+        
+        if (template.maxAttempts) {
+            (form.elements.namedItem("maxAttempts") as HTMLInputElement).value = template.maxAttempts.toString();
+        }
+    };
+
     return (
         <div className="flex-1 space-y-6 p-4 pt-6">
             <div className="flex items-center justify-between space-y-2">
@@ -15,9 +90,17 @@ export default function CreateExamPage() {
                     <h2 className="text-3xl font-bold tracking-tight">Create New Exam</h2>
                     <p className="text-muted-foreground mt-1">Configure your exam with advanced settings and controls</p>
                 </div>
+                <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowTemplateSelector(true)}
+                >
+                    <Bookmark className="h-4 w-4 mr-2" />
+                    Load Template
+                </Button>
             </div>
             
-            <form action={createExamAction} className="mx-auto max-w-4xl space-y-6">
+            <form id="createExamForm" onSubmit={handleFormSubmit} className="mx-auto max-w-4xl space-y-6">
                 {/* Basic Information */}
                 <Card>
                     <CardHeader>
@@ -127,6 +210,21 @@ export default function CreateExamPage() {
                                 <p className="text-sm text-muted-foreground">Display scores and answers right after submission</p>
                             </div>
                             <input type="checkbox" id="showResultsImmediately" name="showResultsImmediately" value="true" defaultChecked className="h-4 w-4" />
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                                <Label htmlFor="negativeMarking">Enable Negative Marking</Label>
+                                <p className="text-sm text-muted-foreground">Deduct marks for wrong answers</p>
+                            </div>
+                            <input type="checkbox" id="negativeMarking" name="negativeMarking" value="true" className="h-4 w-4" />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="negativeMarks">Marks to Deduct (per wrong answer)</Label>
+                            <div className="flex items-center gap-2">
+                                <Input id="negativeMarks" name="negativeMarks" type="number" min="0" max="5" step="0.25" defaultValue="0" className="max-w-[120px]" />
+                                <span className="text-sm text-muted-foreground">marks</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground">Common values: 0.25, 0.33, 0.5, or 1</p>
                         </div>
                         <div className="p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-800">
                             <div className="flex gap-2">
@@ -296,12 +394,54 @@ export default function CreateExamPage() {
                             <Button variant="ghost" type="button">Cancel</Button>
                         </Link>
                         <Button type="submit" size="lg">
-                            <Clock className="mr-2 h-4 w-4" />
-                            Create Exam Draft
+                            <Eye className="mr-2 h-4 w-4" />
+                            Preview & Create
                         </Button>
                     </CardFooter>
                 </Card>
             </form>
+
+            {/* Preview Dialog */}
+            {formData && (
+                <ExamPreviewDialog
+                    open={showPreview}
+                    onOpenChange={setShowPreview}
+                    data={{
+                        title: formData.get("title") as string,
+                        description: formData.get("description") as string,
+                        duration: parseInt(formData.get("duration") as string),
+                        passPercentage: parseInt(formData.get("passPercentage") as string),
+                        antiCheatEnabled: formData.get("antiCheatEnabled") === "true",
+                        maxViolations: parseInt(formData.get("maxViolations") as string),
+                        shuffleQuestions: formData.get("shuffleQuestions") === "true",
+                        shuffleOptions: formData.get("shuffleOptions") === "true",
+                        showResultsImmediately: formData.get("showResultsImmediately") === "true",
+                        requirePassword: formData.get("requirePassword") === "true",
+                        examPassword: formData.get("examPassword") as string,
+                        maxAttempts: formData.get("maxAttempts") ? parseInt(formData.get("maxAttempts") as string) : undefined,
+                        scheduledStartTime: formData.get("scheduledStartTime") as string,
+                        scheduledEndTime: formData.get("scheduledEndTime") as string,
+                        allowLateSubmission: formData.get("allowLateSubmission") === "true",
+                        negativeMarking: formData.get("negativeMarking") === "true",
+                        negativeMarks: parseFloat(formData.get("negativeMarks") as string) || 0,
+                        priceMode: formData.get("priceMode") as string,
+                    }}
+                    onConfirm={handleConfirmCreate}
+                    isSubmitting={isSubmitting}
+                />
+            )}
+
+            {/* Template Selector Dialog */}
+            <TemplateSelectorDialog
+                open={showTemplateSelector}
+                onOpenChange={setShowTemplateSelector}
+                templates={[]}
+                onSelectTemplate={handleTemplateSelect}
+                onSaveAsTemplate={(data) => {
+                    console.log("Save template:", data);
+                    // TODO: Implement template saving
+                }}
+            />
         </div>
     );
 }

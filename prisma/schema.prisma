@@ -22,6 +22,7 @@ model User {
   
   exams         Exam[]
   payments      Payment[]
+  templates     ExamTemplate[]
 }
 
 enum PlanType {
@@ -53,6 +54,8 @@ model Exam {
   shuffleQuestions Boolean    @default(false)  // Randomize question order
   shuffleOptions   Boolean    @default(false)  // Randomize option order
   showResultsImmediately Boolean @default(true) // Show results after submission
+  negativeMarking Boolean     @default(false)  // Enable negative marking
+  negativeMarks   Float       @default(0)      // Marks to deduct per wrong answer (e.g., 0.25)
   
   // Access control
   requirePassword Boolean     @default(false)  // Require password to access
@@ -85,7 +88,10 @@ model Question {
   options       Json     // Array of option objects { id: string, text: string }
   correctOption String   // ID of the correct option
   marks         Int      @default(1)
+  negativeMarks Float    @default(0)  // Negative marks for wrong answer (overrides exam default)
   timeLimit     Int?     // Optional per-question timer in seconds
+  explanation   String?  // Optional explanation shown after submission
+  difficulty    String   @default("MEDIUM") // EASY, MEDIUM, HARD
   createdAt     DateTime @default(now())
 }
 
@@ -131,4 +137,29 @@ enum PaymentStatus {
 enum PaymentType {
   SUBSCRIPTION
   CREDIT_PURCHASE
+}
+
+model ExamTemplate {
+  id              String   @id @default(cuid())
+  name            String
+  description     String?
+  teacherId       String
+  teacher         User     @relation(fields: [teacherId], references: [id])
+  
+  // Exam configuration to be copied
+  duration        Int      // Duration in minutes
+  antiCheatEnabled Boolean @default(true)
+  maxViolations   Int      @default(3)
+  passPercentage  Int      @default(50)
+  shuffleQuestions Boolean @default(false)
+  shuffleOptions   Boolean @default(false)
+  showResultsImmediately Boolean @default(true)
+  negativeMarking Boolean  @default(false)
+  negativeMarks   Float    @default(0)
+  requirePassword Boolean  @default(false)
+  maxAttempts     Int?
+  allowLateSubmission Boolean @default(false)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }

@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { DeleteQuestionButton } from "@/components/delete-question-button";
 import { DeleteExamButton } from "@/components/delete-exam-button";
 import { EditExamForm } from "@/components/edit-exam-form";
+import { BulkImportButton } from "@/components/bulk-import-button";
 import { verifySession } from "@/lib/session";
 import { Prisma } from "@prisma/client";
 import Link from "next/link";
@@ -178,7 +179,10 @@ export default async function ExamEditorPage({
                     {exam.status !== 'PUBLISHED' && (
                         <Card>
                             <CardHeader>
-                                <CardTitle className="text-lg">Add New Question</CardTitle>
+                                <div className="flex items-center justify-between">
+                                    <CardTitle className="text-lg">Add New Question</CardTitle>
+                                    <BulkImportButton examId={examId} />
+                                </div>
                             </CardHeader>
                             <CardContent>
                                 <form action={addQuestionAction.bind(null, examId)} className="space-y-4">

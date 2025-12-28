@@ -77,6 +77,18 @@ export async function createExamAction(formData: FormData) {
     if (scheduledStartTime && scheduledEndTime && scheduledStartTime >= scheduledEndTime) {
         throw new Error("End time must be after start time");
     }
+    
+    // Negative marking settings
+    const negativeMarking = formData.get("negativeMarking") === "true";
+    const negativeMarksStr = formData.get("negativeMarks") as string;
+    const negativeMarks = negativeMarksStr && negativeMarksStr.trim() !== "" 
+        ? parseFloat(negativeMarksStr) 
+        : 0;
+    
+    // Validate negative marks
+    if (negativeMarks < 0 || negativeMarks > 5) {
+        throw new Error("Negative marks must be between 0 and 5");
+    }
 
     let examId = "";
 
@@ -102,6 +114,8 @@ export async function createExamAction(formData: FormData) {
             scheduledStartTime,
             scheduledEndTime,
             allowLateSubmission,
+            negativeMarking,
+            negativeMarks,
         });
 
         const exam = await prisma.exam.create({
@@ -123,6 +137,8 @@ export async function createExamAction(formData: FormData) {
                 scheduledStartTime,
                 scheduledEndTime,
                 allowLateSubmission,
+                negativeMarking,
+                negativeMarks,
             },
         });
         examId = exam.id;
@@ -139,6 +155,85 @@ export async function createExamAction(formData: FormData) {
 
     if (examId) {
         redirect(`/dashboard/exams/${examId}`);
+    }
+}
+
+export async function bulkImportQuestionsAction(
+    examId: string,
+    questions: Array<{
+        text: string;
+        options: { id: string; text: string }[];
+        correctOption: string;
+        marks?: number;
+        negativeMarks?: number;
+        timeLimit?: number;
+        explanation?: string;
+        difficulty?: string;
+    }>
+) {
+    "use server";
+
+    const session = await verifySession();
+    if (!session?.userId) {
+        throw new Error("Unauthorized");
+    }
+
+    try {
+        // Verify exam ownership
+        const exam = await prisma.exam.findUnique({
+            where: { id: examId },
+            select: { teacherId: true, status: true },
+        });
+
+        if (!exam) {
+            throw new Error("Exam not found");
+        }
+
+        if (exam.teacherId !== session.userId) {
+            throw new Error("Unauthorized");
+        }
+
+        if (exam.status === "PUBLISHED") {
+            throw new Error("Cannot add questions to a published exam");
+        }
+
+        // Validate questions
+        if (!questions || questions.length === 0) {
+            throw new Error("No questions to import");
+        }
+
+        if (questions.length > 100) {
+            throw new Error("Cannot import more than 100 questions at once");
+        }
+
+        // Create all questions in a transaction
+        const createdQuestions = await prisma.$transaction(
+            questions.map((q) =>
+                prisma.question.create({
+                    data: {
+                        examId,
+                        text: q.text,
+                        options: q.options,
+                        correctOption: q.correctOption,
+                        marks: q.marks || 1,
+                        negativeMarks: q.negativeMarks || 0,
+                        timeLimit: q.timeLimit || null,
+                        explanation: q.explanation || null,
+                        difficulty: q.difficulty || "MEDIUM",
+                    },
+                })
+            )
+        );
+
+        revalidatePath(`/dashboard/exams/${examId}`);
+        return {
+            success: true,
+            count: createdQuestions.length,
+            message: `Successfully imported ${createdQuestions.length} question(s)`,
+        };
+    } catch (error: any) {
+        console.error("Bulk import error:", error);
+        throw new Error(error.message || "Failed to import questions");
     }
 }
 

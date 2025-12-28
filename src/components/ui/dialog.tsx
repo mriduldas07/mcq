@@ -20,8 +20,8 @@ const Dialog = ({ children, open, onOpenChange }: {
   );
 };
 
-const DialogContent = ({ children }: { children: React.ReactNode }) => {
-  return <div className="p-6">{children}</div>;
+const DialogContent = ({ children, className }: { children: React.ReactNode; className?: string }) => {
+  return <div className={`p-6 ${className || ''}`}>{children}</div>;
 };
 
 const DialogHeader = ({ children }: { children: React.ReactNode }) => {
