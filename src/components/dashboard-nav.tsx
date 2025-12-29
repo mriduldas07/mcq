@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { BarChart, BookOpen, CreditCard, Home, Settings } from "lucide-react";
+import { BarChart, BookOpen, CreditCard, Home, Settings, Library } from "lucide-react";
 import { logoutAction } from "@/actions/auth";
 
 const items = [
@@ -16,6 +16,11 @@ const items = [
         title: "Exams",
         href: "/dashboard/exams",
         icon: BookOpen,
+    },
+    {
+        title: "Question Bank",
+        href: "/dashboard/question-bank",
+        icon: Library,
     },
     {
         title: "Results",

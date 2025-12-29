@@ -397,6 +397,10 @@ export async function updateExamAction(examId: string, formData: FormData) {
         const scheduledStartTime = formData.get("scheduledStartTime") ? new Date(formData.get("scheduledStartTime") as string) : null;
         const scheduledEndTime = formData.get("scheduledEndTime") ? new Date(formData.get("scheduledEndTime") as string) : null;
         const allowLateSubmission = formData.get("allowLateSubmission") === "true";
+        
+        // Negative marking settings
+        const negativeMarking = formData.get("negativeMarking") === "true";
+        const negativeMarks = formData.get("negativeMarks") ? parseFloat(formData.get("negativeMarks") as string) : 0;
 
         await prisma.exam.update({
             where: { id: examId },
@@ -416,6 +420,8 @@ export async function updateExamAction(examId: string, formData: FormData) {
                 scheduledStartTime,
                 scheduledEndTime,
                 allowLateSubmission,
+                negativeMarking,
+                negativeMarks,
             }
         });
 
@@ -461,6 +467,8 @@ export async function duplicateExamAction(examId: string) {
                 scheduledStartTime: exam.scheduledStartTime,
                 scheduledEndTime: exam.scheduledEndTime,
                 allowLateSubmission: exam.allowLateSubmission,
+                negativeMarking: exam.negativeMarking,
+                negativeMarks: exam.negativeMarks,
                 status: "DRAFT",
                 questions: {
                     create: exam.questions.map(q => ({
@@ -468,7 +476,10 @@ export async function duplicateExamAction(examId: string) {
                         options: q.options as any,
                         correctOption: q.correctOption,
                         marks: q.marks,
+                        negativeMarks: q.negativeMarks,
                         timeLimit: q.timeLimit,
+                        explanation: q.explanation,
+                        difficulty: q.difficulty,
                     }))
                 }
             }

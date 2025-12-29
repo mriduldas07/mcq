@@ -23,6 +23,7 @@ model User {
   exams         Exam[]
   payments      Payment[]
   templates     ExamTemplate[]
+  questionBank  QuestionBank[]
 }
 
 enum PlanType {
@@ -162,4 +163,37 @@ model ExamTemplate {
   
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+model QuestionBank {
+  id            String   @id @default(cuid())
+  teacherId     String
+  teacher       User     @relation(fields: [teacherId], references: [id])
+  
+  // Question content (COPY from exam, never reference)
+  text          String   // Keep old name for now, will migrate later
+  options       Json     // Array of option objects { id: string, text: string }
+  correctOption String   // ID of the correct option
+  marks         Int      @default(1)
+  negativeMarks Float    @default(0)  // Keep for compatibility
+  timeLimit     Int?     // Keep for compatibility
+  explanation   String?  // Keep for compatibility
+  
+  // Simple tagging system (MVP)
+  subject       String?  // e.g., "Mathematics", "Physics"
+  topic         String?  // e.g., "Algebra", "Mechanics"
+  difficulty    String   @default("MEDIUM") // EASY, MEDIUM, HARD
+  tags          String[] // Additional tags for filtering
+  
+  // Usage tracking (for analytics later)
+  usageCount    Int      @default(0)  // Keep old name for now
+  lastUsed      DateTime?  // Keep old name for now
+  isPublic      Boolean  @default(false)  // Keep for compatibility
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([teacherId])
+  @@index([subject])
+  @@index([difficulty])
 }

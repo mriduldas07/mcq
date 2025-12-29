@@ -13,6 +13,8 @@ import { DeleteQuestionButton } from "@/components/delete-question-button";
 import { DeleteExamButton } from "@/components/delete-exam-button";
 import { EditExamForm } from "@/components/edit-exam-form";
 import { BulkImportButton } from "@/components/bulk-import-button";
+import { SaveToBankButton } from "@/components/save-to-bank-button";
+import { ImportFromBankButton } from "@/components/import-from-bank-button";
 import { verifySession } from "@/lib/session";
 import { Prisma } from "@prisma/client";
 import Link from "next/link";
@@ -147,9 +149,12 @@ export default async function ExamEditorPage({
                                         <CardHeader className="p-4">
                                             <div className="flex justify-between items-start">
                                                 <span className="font-semibold text-sm">Q{i + 1}</span>
-                                                {exam.status !== 'PUBLISHED' && (
-                                                    <DeleteQuestionButton questionId={q.id} examId={examId} />
-                                                )}
+                                                <div className="flex gap-2">
+                                                    <SaveToBankButton examId={examId} questionId={q.id} />
+                                                    {exam.status !== 'PUBLISHED' && (
+                                                        <DeleteQuestionButton questionId={q.id} examId={examId} />
+                                                    )}
+                                                </div>
                                             </div>
                                             <p className="mt-2">{q.text}</p>
                                         </CardHeader>
@@ -181,7 +186,10 @@ export default async function ExamEditorPage({
                             <CardHeader>
                                 <div className="flex items-center justify-between">
                                     <CardTitle className="text-lg">Add New Question</CardTitle>
-                                    <BulkImportButton examId={examId} />
+                                    <div className="flex gap-2">
+                                        <ImportFromBankButton examId={examId} />
+                                        <BulkImportButton examId={examId} />
+                                    </div>
                                 </div>
                             </CardHeader>
                             <CardContent>
