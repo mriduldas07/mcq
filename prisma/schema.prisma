@@ -11,20 +11,25 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  passwordHash  String?   // Nullable for magic links or OAuth later
-  name          String?
-  planType      PlanType  @default(FREE)
-  credits       Int       @default(0) // For Pay-Per-Exam
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                String    @id @default(cuid())
+  email             String    @unique
+  passwordHash      String?   // Deprecated - keeping for migration
+  name              String?
+  image             String?   // Profile picture from Google
+  provider          String    @default("google") // OAuth provider
+  providerAccountId String?   // Google account ID
+  planType          PlanType  @default(FREE)
+  credits           Int       @default(0) // For Pay-Per-Exam
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
   
   exams         Exam[]
   payments      Payment[]
   templates     ExamTemplate[]
   questionBank  QuestionBank[]
   folders       QuestionFolder[]
+  
+  @@index([provider, providerAccountId])
 }
 
 enum PlanType {

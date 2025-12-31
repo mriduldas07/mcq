@@ -48,7 +48,7 @@ export default function Home() {
           <Link href="/login" className="hidden sm:inline-flex">
             <Button variant="ghost" size="sm" className="text-xs sm:text-sm h-8 sm:h-9">Login</Button>
           </Link>
-          <Link href="/register">
+          <Link href="/login">
             <Button size="sm" className="shadow-md hover:shadow-lg transition-shadow text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-4">
               <span className="hidden sm:inline">Get Started Free</span>
               <span className="sm:hidden">Sign Up</span>
@@ -105,7 +105,7 @@ export default function Home() {
                 
                 {/* CTA Buttons */}
                 <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-2 sm:pt-4 w-full sm:w-auto px-4 sm:px-0">
-                  <Link href="/register" className="w-full sm:w-auto">
+                  <Link href="/login" className="w-full sm:w-auto">
                     <Button size="lg" className="w-full sm:w-auto h-12 sm:h-14 px-6 sm:px-10 text-base sm:text-lg font-semibold shadow-2xl hover:shadow-3xl transition-all group glow-on-hover bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
                       Start for Free
                       <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5 group-hover:translate-x-1 transition-transform" />
@@ -393,7 +393,7 @@ export default function Home() {
                   </ul>
                 </CardContent>
                 <CardHeader className="p-4 sm:p-5 md:p-6 pt-0">
-                  <Link href="/register" className="w-full">
+                  <Link href="/login" className="w-full">
                     <Button variant="outline" size="lg" className="w-full h-11 sm:h-12 text-sm sm:text-base">
                       Get Started Free
                     </Button>
@@ -450,7 +450,7 @@ export default function Home() {
                   </ul>
                 </CardContent>
                 <CardHeader className="p-4 sm:p-5 md:p-6 pt-0">
-                  <Link href="/register" className="w-full">
+                  <Link href="/login" className="w-full">
                     <Button size="lg" className="w-full shadow-lg hover:shadow-xl h-11 sm:h-12 text-sm sm:text-base">
                       Start 14-Day Free Trial
                     </Button>
@@ -464,7 +464,7 @@ export default function Home() {
               <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
                 <strong>Need more?</strong> Contact us for enterprise pricing with custom features, dedicated support, and SLA guarantees.
               </p>
-              <Link href="/register">
+              <Link href="/login">
                 <Button variant="link" className="text-primary text-sm sm:text-base">
                   Contact Sales <ArrowRight className="ml-2 h-3 w-3 sm:h-4 sm:w-4" />
                 </Button>
@@ -498,7 +498,7 @@ export default function Home() {
                   Start creating secure, professional online exams today. No credit card required. Get started in under 5 minutes.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center pt-2 sm:pt-4 px-4">
-                  <Link href="/register" className="w-full sm:w-auto">
+                  <Link href="/login" className="w-full sm:w-auto">
                     <Button size="lg" className="w-full sm:w-auto h-12 sm:h-14 px-6 sm:px-10 text-base sm:text-lg font-semibold bg-white text-purple-600 hover:bg-gray-100 shadow-2xl hover:shadow-3xl transition-all group">
                       Start Free Trial
                       <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5 group-hover:translate-x-1 transition-transform" />
@@ -581,7 +581,7 @@ export default function Home() {
                   <li><Link href="#features" className="text-muted-foreground hover:text-primary transition-colors hover:translate-x-1 inline-block">Features</Link></li>
                   <li><Link href="#pricing" className="text-muted-foreground hover:text-primary transition-colors hover:translate-x-1 inline-block">Pricing</Link></li>
                   <li><Link href="#how-it-works" className="text-muted-foreground hover:text-primary transition-colors hover:translate-x-1 inline-block">How It Works</Link></li>
-                  <li><Link href="/register" className="text-muted-foreground hover:text-primary transition-colors hover:translate-x-1 inline-block">Get Started</Link></li>
+                  <li><Link href="/login" className="text-muted-foreground hover:text-primary transition-colors hover:translate-x-1 inline-block">Get Started</Link></li>
                   <li><Link href="#" className="text-muted-foreground hover:text-primary transition-colors hover:translate-x-1 inline-block">Roadmap</Link></li>
                 </ul>
               </div>

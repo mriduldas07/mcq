@@ -1,54 +1,48 @@
 import "server-only";
-import { SignJWT, jwtVerify } from "jose";
-import { cookies } from "next/headers";
+import { auth } from "@/auth";
 
-const secretKey = process.env.SESSION_SECRET || "mock-secret-key-change-me";
-const encodedKey = new TextEncoder().encode(secretKey);
-
-type SessionPayload = {
+export type SessionUser = {
     userId: string;
-    role: string;
-    expiresAt: Date;
+    email: string;
+    name: string;
+    image: string;
+    planType: string;
+    credits: number;
 };
 
-export async function createSession(userId: string, role: string = "TEACHER") {
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
-    const session = await new SignJWT({ userId, role, expiresAt })
-        .setProtectedHeader({ alg: "HS256" })
-        .setIssuedAt()
-        .setExpirationTime("7d")
-        .sign(encodedKey);
+/**
+ * Get current session (NextAuth wrapper)
+ * Returns user data if authenticated, null otherwise
+ */
+export async function verifySession(): Promise<SessionUser | null> {
+    const session = await auth();
+    
+    if (!session || !session.user) {
+        return null;
+    }
 
-    const cookieStore = await cookies();
-    cookieStore.set("session", session, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        expires: expiresAt,
-        sameSite: "lax",
-        path: "/",
-    });
+    return {
+        userId: session.user.id,
+        email: session.user.email,
+        name: session.user.name,
+        image: session.user.image,
+        planType: session.user.planType,
+        credits: session.user.credits,
+    };
 }
 
-export async function verifySession() {
-    const cookieStore = await cookies();
-    const session = cookieStore.get("session")?.value;
+/**
+ * Get current session (alias for verifySession)
+ */
+export async function getSession() {
+    return verifySession();
+}
 
-    if (!session) {
-        return null;
-    }
-
-    try {
-        const { payload } = await jwtVerify(session, encodedKey, {
-            algorithms: ["HS256"],
-        });
-        return payload as SessionPayload;
-    } catch (error) {
-        console.log("Session verification failed");
-        return null;
-    }
+// Legacy function names for backward compatibility
+export async function createSession() {
+    throw new Error("createSession is deprecated. Use signIn from next-auth instead.");
 }
 
 export async function deleteSession() {
-    const cookieStore = await cookies();
-    cookieStore.delete("session");
+    throw new Error("deleteSession is deprecated. Use signOut from next-auth instead.");
 }
