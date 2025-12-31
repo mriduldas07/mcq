@@ -95,6 +95,16 @@ export async function createExamAction(formData: FormData) {
     try {
         const teacherId = session.userId;
         
+        // Verify the user exists in the database
+        const user = await prisma.user.findUnique({
+            where: { id: teacherId }
+        });
+        
+        if (!user) {
+            console.error("User not found in database. Session userId:", teacherId);
+            throw new Error("Your account was not found. Please logout and login again. If you just registered, your account may not be properly created.");
+        }
+        
         // Log the data being sent to Prisma for debugging
         console.log("Creating exam with data:", {
             title,

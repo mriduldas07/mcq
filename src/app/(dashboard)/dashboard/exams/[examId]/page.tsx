@@ -56,6 +56,34 @@ export default async function ExamEditorPage({
 
     if (!exam) return notFound();
 
+    // Batch check all questions' bank status in ONE query
+    const questionTexts = exam.questions.map(q => q.text);
+    const questionsInBank = await prisma.questionBank.findMany({
+        where: {
+            teacherId: session.userId,
+            text: { in: questionTexts },
+        },
+        select: {
+            text: true,
+            folderId: true,
+            folder: {
+                select: {
+                    id: true,
+                    name: true,
+                },
+            },
+        },
+    });
+
+    // Create a map for O(1) lookup
+    const bankStatusMap = new Map(
+        questionsInBank.map(q => [q.text, { 
+            inBank: true, 
+            folderId: q.folderId, 
+            folderName: q.folder?.name 
+        }])
+    );
+
     const userCredits = user?.credits || 0;
     const isPro = user?.planType === "PRO";
 
@@ -150,7 +178,11 @@ export default async function ExamEditorPage({
                                             <div className="flex justify-between items-start">
                                                 <span className="font-semibold text-sm">Q{i + 1}</span>
                                                 <div className="flex gap-2">
-                                                    <SaveToBankButton examId={examId} questionId={q.id} />
+                                                    <SaveToBankButton 
+                                                        examId={examId} 
+                                                        questionId={q.id}
+                                                        initialStatus={bankStatusMap.get(q.text) || { inBank: false }}
+                                                    />
                                                     {exam.status !== 'PUBLISHED' && (
                                                         <DeleteQuestionButton questionId={q.id} examId={examId} />
                                                     )}

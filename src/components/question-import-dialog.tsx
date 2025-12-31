@@ -27,7 +27,7 @@ interface QuestionImportDialogProps {
 
 export function QuestionImportDialog({ open, onOpenChange, onImport }: QuestionImportDialogProps) {
   const [importText, setImportText] = useState("");
-  const [importFormat, setImportFormat] = useState<"json" | "csv" | "pdf" | "docx">("json");
+  const [importFormat, setImportFormat] = useState<"json" | "csv" | "pdf" | "docx" | "text">("json");
   const [parseError, setParseError] = useState<string | null>(null);
   const [parsedQuestions, setParsedQuestions] = useState<QuestionImportData[] | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -78,6 +78,11 @@ export function QuestionImportDialog({ open, onOpenChange, onImport }: QuestionI
   const handlePDFUpload = async (file: File) => {
     try {
       const { parsePDF, validateQuestions } = await import('@/lib/document-parser');
+      
+      console.log('=== PDF Upload Started ===');
+      console.log('File name:', file.name);
+      console.log('File size:', file.size, 'bytes');
+      
       const questions = await parsePDF(file);
       
       const validation = validateQuestions(questions);
@@ -88,6 +93,8 @@ export function QuestionImportDialog({ open, onOpenChange, onImport }: QuestionI
       setParsedQuestions(questions);
       setIsProcessing(false);
     } catch (error: any) {
+      console.error('=== PDF Upload Failed ===');
+      console.error('Error:', error);
       setParseError(error.message || "Failed to parse PDF");
       setIsProcessing(false);
     }
@@ -185,7 +192,12 @@ export function QuestionImportDialog({ open, onOpenChange, onImport }: QuestionI
     return questions;
   };
 
-  const handlePreview = () => {
+  const parseText = async (text: string): Promise<QuestionImportData[]> => {
+    const { parseQuestionText } = await import('@/lib/document-parser');
+    return parseQuestionText(text);
+  };
+
+  const handlePreview = async () => {
     setParseError(null);
     setParsedQuestions(null);
 
@@ -194,6 +206,17 @@ export function QuestionImportDialog({ open, onOpenChange, onImport }: QuestionI
       
       if (importFormat === "json") {
         questions = parseJSON(importText);
+      } else if (importFormat === "csv") {
+        questions = parseCSV(importText);
+      } else if (importFormat === "text") {
+        // Use the document parser for text format
+        const { validateQuestions } = await import('@/lib/document-parser');
+        questions = await parseText(importText);
+        
+        const validation = validateQuestions(questions);
+        if (!validation.valid) {
+          throw new Error(`Validation errors:\n${validation.errors.join('\n')}`);
+        }
       } else {
         questions = parseCSV(importText);
       }
@@ -287,6 +310,14 @@ export function QuestionImportDialog({ open, onOpenChange, onImport }: QuestionI
             </Button>
             <Button
               type="button"
+              variant={importFormat === "text" ? "default" : "outline"}
+              onClick={() => setImportFormat("text" as any)}
+              size="sm"
+            >
+              📝 Text
+            </Button>
+            <Button
+              type="button"
               variant={importFormat === "json" ? "default" : "outline"}
               onClick={() => setImportFormat("json")}
               size="sm"
@@ -337,8 +368,8 @@ export function QuestionImportDialog({ open, onOpenChange, onImport }: QuestionI
             )}
           </div>
 
-          {/* Text Input - Only for JSON/CSV */}
-          {(importFormat === "json" || importFormat === "csv") && (
+          {/* Text Input - Only for JSON/CSV/TEXT */}
+          {(importFormat === "json" || importFormat === "csv" || importFormat === "text") && (
             <>
               <div className="space-y-2">
                 <Label htmlFor="importText">Or Paste {importFormat.toUpperCase()} Content</Label>
@@ -349,7 +380,9 @@ export function QuestionImportDialog({ open, onOpenChange, onImport }: QuestionI
                   placeholder={
                     importFormat === "json"
                       ? 'Paste JSON array of questions...\n[\n  {\n    "text": "Question text",\n    "options": [{"id": "opt_1", "text": "Option 1"}, ...],\n    "correctOption": "opt_1",\n    "marks": 1\n  }\n]'
-                      : 'Paste CSV content...\nQuestion,Option1,Option2,Option3,Option4,CorrectOption,Marks,NegativeMarks,TimeLimit,Explanation,Difficulty\nWhat is 2+2?,3,4,5,6,2,1,0.25,60,Explanation,EASY'
+                      : importFormat === "csv"
+                      ? 'Paste CSV content...\nQuestion,Option1,Option2,Option3,Option4,CorrectOption,Marks,NegativeMarks,TimeLimit,Explanation,Difficulty\nWhat is 2+2?,3,4,5,6,2,1,0.25,60,Explanation,EASY'
+                      : 'Paste your questions in this format:\n\nQ1. What is the capital of France?\nA) London\nB) Paris\nC) Berlin\nD) Madrid\nAnswer: B\nMarks: 2\nNegative: 0.5\nTime: 60\nDifficulty: MEDIUM\nExplanation: Paris is the capital city of France.\n\nQ2. Next question...'
                   }
                   className="font-mono text-xs min-h-[200px]"
                 />

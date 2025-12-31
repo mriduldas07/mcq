@@ -37,8 +37,8 @@ export async function parsePDF(file: File): Promise<ParsedQuestion[]> {
     // Dynamic import for client-side only
     const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs') as any;
     
-    // Set worker path
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+    // Set worker path to use local worker file from public directory
+    pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -49,16 +49,32 @@ export async function parsePDF(file: File): Promise<ParsedQuestion[]> {
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
       const textContent = await page.getTextContent();
+      // Preserve line breaks by checking Y coordinates
+      let lastY = -1;
       const pageText = textContent.items
-        .map((item: any) => item.str)
+        .map((item: any) => {
+          const currentY = item.transform[5];
+          const text = item.str;
+          
+          // Add newline if Y position changed significantly
+          if (lastY !== -1 && Math.abs(currentY - lastY) > 5) {
+            lastY = currentY;
+            return '\n' + text;
+          }
+          
+          lastY = currentY;
+          return text;
+        })
         .join(' ');
-      fullText += pageText + '\n';
+      fullText += pageText + '\n\n';
     }
+    
+    console.log('Extracted PDF text:', fullText.substring(0, 500)); // Log first 500 chars
     
     return parseQuestionText(fullText);
   } catch (error) {
     console.error('PDF parsing error:', error);
-    throw new Error('Failed to parse PDF file. Please check the format.');
+    throw new Error(`Failed to parse PDF file: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
@@ -85,28 +101,62 @@ export async function parseDOCX(file: File): Promise<ParsedQuestion[]> {
  * Parse text content to extract questions
  * Supports flexible formatting
  */
-function parseQuestionText(text: string): ParsedQuestion[] {
+export function parseQuestionText(text: string): ParsedQuestion[] {
   const questions: ParsedQuestion[] = [];
   
-  // Split by question markers (Q1., Q2., etc. or just numbers)
-  const questionBlocks = text.split(/Q\d+\.|^\d+\./gm).filter(block => block.trim());
+  // Clean up the text - normalize multiple spaces but preserve line breaks
+  text = text.replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
   
-  for (let block of questionBlocks) {
+  // Try multiple split patterns
+  let questionBlocks = text.split(/Q\d+\.\s*/gi).filter(block => block.trim());
+  
+  // If no matches, try alternative patterns
+  if (questionBlocks.length <= 1) {
+    questionBlocks = text.split(/Question\s*\d+[:.)]\s*/gi).filter(block => block.trim());
+  }
+  
+  // If still no matches, try just number with period
+  if (questionBlocks.length <= 1) {
+    questionBlocks = text.split(/\b\d+\.\s+/g).filter(block => block.trim());
+  }
+  
+  console.log(`Found ${questionBlocks.length} question blocks`);
+  if (questionBlocks.length > 0) {
+    console.log('First block preview:', questionBlocks[0].substring(0, 300));
+  } else {
+    console.log('Raw text preview:', text.substring(0, 500));
+  }
+  
+  for (let i = 0; i < questionBlocks.length; i++) {
+    const block = questionBlocks[i];
     try {
       const question = parseQuestionBlock(block.trim());
       if (question) {
         questions.push(question);
+        console.log(`✓ Successfully parsed question ${i + 1}`);
+      } else {
+        console.warn(`✗ Question ${i + 1} returned null`);
+        console.warn(`Block content:`, block.substring(0, 200));
       }
     } catch (error) {
-      console.warn('Skipping invalid question block:', error);
+      console.error(`✗ Failed to parse question ${i + 1}:`, error);
+      console.error(`Block content:`, block.substring(0, 200));
+      // Don't skip - continue trying to parse remaining questions
       continue;
     }
   }
   
+  // Log summary
+  console.log(`\n=== PARSING SUMMARY ===`);
+  console.log(`Total blocks found: ${questionBlocks.length}`);
+  console.log(`Successfully parsed: ${questions.length}`);
+  console.log(`Failed/Skipped: ${questionBlocks.length - questions.length}`);
+  
   if (questions.length === 0) {
-    throw new Error('No valid questions found in document');
+    throw new Error('No valid questions found in document. Check console for details.');
   }
   
+  console.log(`Successfully parsed ${questions.length} questions`);
   return questions;
 }
 
@@ -115,30 +165,75 @@ function parseQuestionText(text: string): ParsedQuestion[] {
  */
 function parseQuestionBlock(block: string): ParsedQuestion | null {
   // Extract question text (everything before first option)
-  const optionMatch = block.match(/[A-D]\)|\([A-D]\)|[A-D]\.|[A-D]:/i);
-  if (!optionMatch) return null;
+  const optionMatch = block.match(/\b[A-D]\s*\)|\b[A-D]\s*\./i);
+  if (!optionMatch) {
+    console.warn('No option markers found in block');
+    return null;
+  }
   
   const questionText = block.substring(0, optionMatch.index).trim();
-  if (!questionText) return null;
+  if (!questionText) {
+    console.warn('Empty question text');
+    return null;
+  }
   
-  // Extract options (A, B, C, D)
+  // Extract options (A, B, C, D) - more flexible pattern
   const options: { id: string; text: string }[] = [];
-  const optionRegex = /[A-D]\)\s*([^\n]+)|[A-D]\.\s*([^\n]+)|[A-D]:\s*([^\n]+)|\([A-D]\)\s*([^\n]+)/gi;
-  let match;
-  let optionIndex = 0;
   
-  while ((match = optionRegex.exec(block)) !== null && optionIndex < 4) {
-    const optionText = (match[1] || match[2] || match[3] || match[4] || '').trim();
-    if (optionText) {
+  // First, try to find all option markers and extract text between them
+  const optionMarkers = [
+    { letter: 'A', regex: /\bA\s*[\)\.]/i },
+    { letter: 'B', regex: /\bB\s*[\)\.]/i },
+    { letter: 'C', regex: /\bC\s*[\)\.]/i },
+    { letter: 'D', regex: /\bD\s*[\)\.]/i }
+  ];
+  
+  const foundOptions: Array<{letter: string, start: number, end: number}> = [];
+  
+  for (const marker of optionMarkers) {
+    const match = block.match(marker.regex);
+    if (match && match.index !== undefined) {
+      foundOptions.push({
+        letter: marker.letter,
+        start: match.index + match[0].length,
+        end: -1
+      });
+    }
+  }
+  
+  // Sort by position
+  foundOptions.sort((a, b) => a.start - b.start);
+  
+  // Set end positions
+  for (let i = 0; i < foundOptions.length; i++) {
+    if (i < foundOptions.length - 1) {
+      foundOptions[i].end = foundOptions[i + 1].start - foundOptions[i + 1].letter.length - 2;
+    } else {
+      // Last option - find where Answer: or other metadata starts
+      const metaMatch = block.substring(foundOptions[i].start).match(/\s+(Answer:|Marks:|Negative:|Time:|Difficulty:|Explanation:)/i);
+      foundOptions[i].end = metaMatch ? foundOptions[i].start + metaMatch.index! : block.length;
+    }
+  }
+  
+  // Extract option text
+  for (const opt of foundOptions) {
+    const optionText = block.substring(opt.start, opt.end).trim();
+    if (optionText && optionText.length > 0) {
+      const optionIndex = opt.letter.charCodeAt(0) - 65; // A=0, B=1, C=2, D=3
       options.push({
         id: `opt_${optionIndex + 1}`,
         text: optionText
       });
-      optionIndex++;
     }
   }
   
-  if (options.length < 2) return null;
+  if (options.length < 2) {
+    console.warn(`Only found ${options.length} options out of ${foundOptions.length} markers`);
+    if (foundOptions.length > 0) {
+      console.warn('Option markers found at positions:', foundOptions.map(o => `${o.letter}:${o.start}`));
+    }
+    return null;
+  }
   
   // Extract answer
   const answerMatch = block.match(/Answer:\s*([A-D])|Correct:\s*([A-D])|Ans:\s*([A-D])/i);

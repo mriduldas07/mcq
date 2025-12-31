@@ -24,6 +24,7 @@ model User {
   payments      Payment[]
   templates     ExamTemplate[]
   questionBank  QuestionBank[]
+  folders       QuestionFolder[]
 }
 
 enum PlanType {
@@ -170,6 +171,10 @@ model QuestionBank {
   teacherId     String
   teacher       User     @relation(fields: [teacherId], references: [id])
   
+  // Folder organization (NEW)
+  folderId      String?
+  folder        QuestionFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  
   // Question content (COPY from exam, never reference)
   text          String   // Keep old name for now, will migrate later
   options       Json     // Array of option objects { id: string, text: string }
@@ -194,6 +199,32 @@ model QuestionBank {
   updatedAt     DateTime @updatedAt
   
   @@index([teacherId])
+  @@index([folderId])
   @@index([subject])
   @@index([difficulty])
+}
+
+// Folder structure for organizing questions (like Google Drive)
+model QuestionFolder {
+  id            String   @id @default(cuid())
+  name          String
+  color         String?  // Optional color for visual organization
+  icon          String?  // Optional emoji/icon
+  teacherId     String
+  teacher       User     @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  
+  // Hierarchical structure (nested folders)
+  parentId      String?
+  parent        QuestionFolder?  @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  subfolders    QuestionFolder[] @relation("FolderHierarchy")
+  
+  // Questions in this folder
+  questions     QuestionBank[]
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([teacherId])
+  @@index([parentId])
+  @@unique([teacherId, name, parentId]) // Prevent duplicate folder names in same location
 }

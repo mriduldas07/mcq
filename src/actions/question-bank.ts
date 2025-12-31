@@ -19,6 +19,7 @@ export async function addToQuestionBankAction(data: {
   subject?: string;
   topic?: string;
   tags?: string[];
+  folderId?: string | null;
 }) {
   "use server";
 
@@ -39,6 +40,7 @@ export async function addToQuestionBankAction(data: {
         subject: data.subject,
         topic: data.topic,
         tags: data.tags || [],
+        folderId: data.folderId || null,
       },
     });
 
@@ -67,6 +69,7 @@ export async function updateQuestionBankAction(
     subject: string | null;
     topic: string | null;
     tags: string[];
+    folderId: string | null;
   }>
 ) {
   "use server";
@@ -233,6 +236,7 @@ export async function duplicateQuestionsAction(questionIds: string[]) {
             subject: q.subject,
             topic: q.topic,
             tags: q.tags,
+            folderId: q.folderId, // Keep in same folder
           },
         })
       )
@@ -335,7 +339,8 @@ export async function importFromQuestionBankAction(
  */
 export async function saveToQuestionBankAction(
   examId: string,
-  questionId: string
+  questionId: string,
+  folderId?: string | null
 ) {
   "use server";
 
@@ -382,7 +387,7 @@ export async function saveToQuestionBankAction(
     }
 
     // COPY to question bank (MVP: simple copy, no reference)
-    await prisma.questionBank.create({
+    const savedQuestion = await prisma.questionBank.create({
       data: {
         teacherId: session.userId,
         text: question.text,
@@ -391,13 +396,71 @@ export async function saveToQuestionBankAction(
         marks: question.marks,
         difficulty: question.difficulty || "MEDIUM",
         tags: [],
+        folderId: folderId || null,
       },
     });
 
     revalidatePath("/dashboard/question-bank");
-    return { success: true, message: "Question saved to your bank!" };
+    return { success: true, message: "Question saved to your bank!", questionId: savedQuestion.id };
   } catch (error: any) {
     console.error("Save to question bank error:", error);
     throw new Error(error.message || "Failed to save question to bank");
+  }
+}
+
+/**
+ * Check if a question from an exam is already in the question bank
+ */
+export async function checkQuestionInBank(examId: string, questionId: string) {
+  try {
+    const session = await verifySession();
+    if (!session) {
+      throw new Error("Unauthorized");
+    }
+
+    // Get the question from the exam
+    const question = await prisma.question.findUnique({
+      where: { id: questionId },
+      include: {
+        exam: {
+          select: {
+            teacherId: true,
+          },
+        },
+      },
+    });
+
+    if (!question || question.exam.teacherId !== session.userId) {
+      return { inBank: false };
+    }
+
+    // Check if a question with matching text exists in the question bank
+    const existingQuestion = await prisma.questionBank.findFirst({
+      where: {
+        teacherId: session.userId,
+        text: question.text,
+      },
+      include: {
+        folder: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    if (existingQuestion) {
+      return {
+        inBank: true,
+        folderId: existingQuestion.folderId,
+        folderName: existingQuestion.folder?.name,
+      };
+    }
+
+    return { inBank: false };
+  } catch (error: any) {
+    console.error("Check question in bank error:", error);
+    return { inBank: false };
   }
 }
