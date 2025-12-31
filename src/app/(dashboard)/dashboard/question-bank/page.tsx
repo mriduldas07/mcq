@@ -40,7 +40,7 @@ export default async function QuestionBankPage({
   const questions = await prisma.questionBank.findMany({
     where: {
       teacherId: session.userId,
-      folderId: currentFolderId === null ? undefined : currentFolderId,
+      folderId: currentFolderId, // null = root level, string = specific folder
     },
     include: {
       folder: true,
