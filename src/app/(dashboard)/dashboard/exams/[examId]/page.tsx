@@ -79,7 +79,7 @@ export default async function ExamEditorPage({
     const bankStatusMap = new Map(
         questionsInBank.map(q => [q.text, { 
             inBank: true, 
-            folderId: q.folderId, 
+            folderId: q.folderId || undefined, 
             folderName: q.folder?.name 
         }])
     );

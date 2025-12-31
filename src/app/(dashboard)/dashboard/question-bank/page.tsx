@@ -55,7 +55,7 @@ export default async function QuestionBankPage({
   if (currentFolderId) {
     let folderId: string | null = currentFolderId;
     while (folderId) {
-      const folder = await prisma.questionFolder.findUnique({
+      const folder: { id: string; parentId: string | null } | null = await prisma.questionFolder.findUnique({
         where: { id: folderId },
       });
       if (folder) {

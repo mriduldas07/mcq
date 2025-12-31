@@ -350,7 +350,7 @@ export async function getFolderPath(folderId: string | null): Promise<Folder[]> 
   let currentId: string | null = folderId;
 
   while (currentId) {
-    const folder = await prisma.questionFolder.findUnique({
+    const folder: Folder | null = await prisma.questionFolder.findUnique({
       where: { id: currentId },
       include: {
         _count: {
@@ -360,14 +360,14 @@ export async function getFolderPath(folderId: string | null): Promise<Folder[]> 
           },
         },
       },
-    });
+    }) as Folder | null;
 
     if (!folder || folder.teacherId !== session.userId) {
       break;
     }
 
     path.unshift(folder);
-    currentId = folder.parentId;
+    currentId = folder.parentId ?? null;
   }
 
   return path;
