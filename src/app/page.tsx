@@ -5,6 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { AnimatedSection, FloatingBadge, GradientText, ScrollReveal, ParallaxSection, StaggeredFade } from "@/components/home-client";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ExamDoodleBackground } from "@/components/exam-doodles";
+import { UserAccountNav } from "@/components/user-account-nav";
+import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
 import { 
   Check, 
   Zap, 
@@ -23,7 +26,23 @@ import {
   CheckCircle2
 } from "lucide-react";
 
-export default function Home() {
+export default async function Home() {
+  // Check if user is logged in
+  const session = await auth();
+  let user = null;
+  
+  if (session?.user?.email) {
+    user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      select: {
+        name: true,
+        email: true,
+        image: true,
+        planType: true,
+        credits: true,
+      },
+    });
+  }
   return (
     <div className="flex flex-col min-h-screen">
       {/* Navbar */}
@@ -45,15 +64,26 @@ export default function Home() {
             How It Works
           </Link>
           <ThemeToggle />
-          <Link href="/login" className="hidden sm:inline-flex">
-            <Button variant="ghost" size="sm" className="text-xs sm:text-sm h-8 sm:h-9">Login</Button>
-          </Link>
-          <Link href="/login">
-            <Button size="sm" className="shadow-md hover:shadow-lg transition-shadow text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-4">
-              <span className="hidden sm:inline">Get Started Free</span>
-              <span className="sm:hidden">Sign Up</span>
-            </Button>
-          </Link>
+          {user ? (
+            <>
+              <Link href="/dashboard">
+                <Button variant="ghost" size="sm" className="text-xs sm:text-sm h-8 sm:h-9">Dashboard</Button>
+              </Link>
+              <UserAccountNav user={user} />
+            </>
+          ) : (
+            <>
+              <Link href="/login" className="hidden sm:inline-flex">
+                <Button variant="ghost" size="sm" className="text-xs sm:text-sm h-8 sm:h-9">Login</Button>
+              </Link>
+              <Link href="/login">
+                <Button size="sm" className="shadow-md hover:shadow-lg transition-shadow text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-4">
+                  <span className="hidden sm:inline">Get Started Free</span>
+                  <span className="sm:hidden">Sign Up</span>
+                </Button>
+              </Link>
+            </>
+          )}
         </nav>
       </header>
 

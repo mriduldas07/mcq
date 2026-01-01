@@ -5,6 +5,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { verifySession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 
 export default async function DashboardLayout({
     children,
@@ -38,9 +39,9 @@ export default async function DashboardLayout({
                 <div className="container flex h-14 sm:h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
                     <div className="flex gap-3 sm:gap-4 md:gap-6 items-center">
                         <MobileNav />
-                        <a className="flex items-center font-bold text-base sm:text-lg hover:opacity-80 transition-opacity" href="/dashboard">
+                        <Link className="flex items-center font-bold text-base sm:text-lg hover:opacity-80 transition-opacity" href="/">
                             MCQ Platform
-                        </a>
+                        </Link>
                     </div>
                     <div className="flex items-center gap-2 sm:gap-3">
                         <ThemeToggle />
