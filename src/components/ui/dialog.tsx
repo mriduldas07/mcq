@@ -36,8 +36,8 @@ const DialogDescription = ({ children, className }: { children: React.ReactNode;
   return <p className={`text-sm text-muted-foreground ${className || ''}`}>{children}</p>;
 };
 
-const DialogFooter = ({ children }: { children: React.ReactNode }) => {
-  return <div className="flex justify-end gap-2 mt-6">{children}</div>;
+const DialogFooter = ({ children, className }: { children: React.ReactNode; className?: string }) => {
+  return <div className={`flex justify-end gap-2 mt-6 ${className || ''}`}>{children}</div>;
 };
 
 export { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter };

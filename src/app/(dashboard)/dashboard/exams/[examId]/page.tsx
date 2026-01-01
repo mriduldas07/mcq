@@ -88,12 +88,13 @@ export default async function ExamEditorPage({
     const isPro = user?.planType === "PRO";
 
     return (
-        <div className="flex-1 space-y-4 p-4 pt-6">
-            <div className="flex items-center justify-between">
-                <h2 className="text-3xl font-bold tracking-tight">{exam.title}</h2>
-                <div className="flex items-center gap-2">
+        <div className="flex-1 space-y-4 sm:space-y-6 overflow-hidden w-full max-w-full">
+            {/* Header Section */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 min-w-0">
+                <h2 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight break-words pr-2">{exam.title}</h2>
+                <div className="flex flex-wrap items-center gap-2">
                     {exam.status === 'PUBLISHED' && <CopyLinkButton examId={examId} />}
-                    <span className="text-sm text-muted-foreground uppercase font-semibold">{exam.status}</span>
+                    <span className="text-xs sm:text-sm text-muted-foreground uppercase font-semibold whitespace-nowrap">{exam.status}</span>
                     {exam.status !== 'PUBLISHED' && (
                         <PublishButton 
                             examId={examId} 
@@ -108,19 +109,19 @@ export default async function ExamEditorPage({
                 </div>
             </div>
 
-            {/* TASK 5: Payment Warning Banner */}
+            {/* Payment Warning Banner */}
             {!isPro && userCredits === 0 && exam.status !== 'PUBLISHED' && (
-                <Card className="border-orange-200 bg-orange-50">
-                    <CardContent className="pt-6">
-                        <div className="flex items-start gap-3">
-                            <AlertCircle className="h-5 w-5 text-orange-600 mt-0.5" />
-                            <div className="flex-1">
-                                <h3 className="font-semibold text-orange-900">No Credits Available</h3>
-                                <p className="text-sm text-orange-700 mt-1">
+                <Card className="border-orange-200 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-900">
+                    <CardContent className="p-4 sm:pt-6">
+                        <div className="flex flex-col sm:flex-row items-start gap-3">
+                            <AlertCircle className="h-5 w-5 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
+                            <div className="flex-1 space-y-2">
+                                <h3 className="font-semibold text-orange-900 dark:text-orange-300 text-sm sm:text-base">No Credits Available</h3>
+                                <p className="text-xs sm:text-sm text-orange-700 dark:text-orange-400">
                                     You need credits to publish exams. Purchase credits or upgrade to Pro for unlimited exams.
                                 </p>
                                 <Link href="/dashboard/billing">
-                                    <Button variant="outline" size="sm" className="mt-3 border-orange-600 text-orange-700 hover:bg-orange-100">
+                                    <Button variant="outline" size="sm" className="mt-2 border-orange-600 text-orange-700 hover:bg-orange-100 dark:border-orange-700 dark:text-orange-400 dark:hover:bg-orange-950 w-full sm:w-auto">
                                         Go to Billing
                                     </Button>
                                 </Link>
@@ -131,17 +132,17 @@ export default async function ExamEditorPage({
             )}
 
             {!isPro && userCredits > 0 && userCredits <= 2 && exam.status !== 'PUBLISHED' && (
-                <Card className="border-yellow-200 bg-yellow-50">
-                    <CardContent className="pt-6">
-                        <div className="flex items-start gap-3">
-                            <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5" />
-                            <div className="flex-1">
-                                <h3 className="font-semibold text-yellow-900">Low Credits</h3>
-                                <p className="text-sm text-yellow-700 mt-1">
+                <Card className="border-yellow-200 bg-yellow-50 dark:bg-yellow-950/20 dark:border-yellow-900">
+                    <CardContent className="p-4 sm:pt-6">
+                        <div className="flex flex-col sm:flex-row items-start gap-3">
+                            <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
+                            <div className="flex-1 space-y-2">
+                                <h3 className="font-semibold text-yellow-900 dark:text-yellow-300 text-sm sm:text-base">Low Credits</h3>
+                                <p className="text-xs sm:text-sm text-yellow-700 dark:text-yellow-400">
                                     You have {userCredits} credit{userCredits !== 1 ? 's' : ''} remaining. Consider topping up or upgrading to Pro.
                                 </p>
                                 <Link href="/dashboard/billing">
-                                    <Button variant="outline" size="sm" className="mt-3 border-yellow-600 text-yellow-700 hover:bg-yellow-100">
+                                    <Button variant="outline" size="sm" className="mt-2 border-yellow-600 text-yellow-700 hover:bg-yellow-100 dark:border-yellow-700 dark:text-yellow-400 dark:hover:bg-yellow-950 w-full sm:w-auto">
                                         Manage Billing
                                     </Button>
                                 </Link>
@@ -151,17 +152,17 @@ export default async function ExamEditorPage({
                 </Card>
             )}
 
-            <div className="grid gap-4 md:grid-cols-[1fr_350px]">
-                <div className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-[1fr_350px] overflow-hidden">
+                <div className="space-y-4 min-w-0">
                     {/* Question List */}
                     {exam.questions.length === 0 ? (
                         <Card className="border-dashed">
-                            <CardContent className="flex h-32 items-center justify-center text-muted-foreground">
+                            <CardContent className="flex h-32 items-center justify-center text-muted-foreground text-sm">
                                 No questions yet. Add one below.
                             </CardContent>
                         </Card>
                     ) : (
-                        <div className="space-y-4">
+                        <div className="space-y-4 min-w-0">
                             {exam.questions.map((q, i: number) => {
                                 let options: Array<{ id: string; text: string }> = [];
                                 try {
@@ -173,11 +174,11 @@ export default async function ExamEditorPage({
                                 }
                                 
                                 return (
-                                    <Card key={q.id}>
-                                        <CardHeader className="p-4">
-                                            <div className="flex justify-between items-start">
-                                                <span className="font-semibold text-sm">Q{i + 1}</span>
-                                                <div className="flex gap-2">
+                                    <Card key={q.id} className="overflow-hidden">
+                                        <CardHeader className="p-3 sm:p-4">
+                                            <div className="flex justify-between items-start gap-2 min-w-0">
+                                                <span className="font-semibold text-sm flex-shrink-0">Q{i + 1}</span>
+                                                <div className="flex gap-2 flex-shrink-0">
                                                     <SaveToBankButton 
                                                         examId={examId} 
                                                         questionId={q.id}
@@ -188,16 +189,16 @@ export default async function ExamEditorPage({
                                                     )}
                                                 </div>
                                             </div>
-                                            <p className="mt-2">{q.text}</p>
+                                            <p className="mt-2 text-sm sm:text-base break-words overflow-wrap-anywhere">{q.text}</p>
                                         </CardHeader>
-                                        <CardContent className="pt-0 pb-4">
-                                            <div className="space-y-1">
+                                        <CardContent className="pt-0 pb-3 sm:pb-4 px-3 sm:px-4">
+                                            <div className="space-y-1 min-w-0">
                                                 {options.map((opt) => (
                                                     <div 
                                                         key={opt.id} 
-                                                        className={`text-sm px-3 py-1.5 rounded ${
+                                                        className={`text-xs sm:text-sm px-2 sm:px-3 py-1.5 rounded break-words overflow-wrap-anywhere ${
                                                             opt.id === q.correctOption 
-                                                                ? 'bg-green-50 text-green-700 font-medium' 
+                                                                ? 'bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 font-medium' 
                                                                 : 'text-muted-foreground'
                                                         }`}
                                                     >
@@ -216,30 +217,30 @@ export default async function ExamEditorPage({
                     {exam.status !== 'PUBLISHED' && (
                         <Card>
                             <CardHeader>
-                                <div className="flex items-center justify-between">
-                                    <CardTitle className="text-lg">Add New Question</CardTitle>
-                                    <div className="flex gap-2">
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-2">
+                                    <CardTitle className="text-base sm:text-lg">Add New Question</CardTitle>
+                                    <div className="flex flex-wrap gap-2">
                                         <ImportFromBankButton examId={examId} />
                                         <BulkImportButton examId={examId} />
                                     </div>
                                 </div>
                             </CardHeader>
-                            <CardContent>
+                            <CardContent className="p-3 sm:p-6">
                                 <form action={addQuestionAction.bind(null, examId)} className="space-y-4">
                                     <div className="space-y-2">
-                                        <Label>Question Text</Label>
-                                        <Textarea name="text" placeholder="What is the capital of France?" required />
+                                        <Label className="text-xs sm:text-sm">Question Text</Label>
+                                        <Textarea name="text" placeholder="What is the capital of France?" required className="resize-none" rows={3} />
                                     </div>
                                     <div className="grid gap-2">
-                                        <Label>Options (select the correct answer)</Label>
+                                        <Label className="text-xs sm:text-sm">Options (select the correct answer)</Label>
                                         {[0, 1, 2, 3].map((i) => (
-                                            <div key={i} className="flex items-center gap-2">
-                                                <input type="radio" name="correctOption" value={i} required className="h-4 w-4" defaultChecked={i === 0} />
-                                                <Input name={`option${i}`} placeholder={`Option ${i + 1}`} required />
+                                            <div key={i} className="flex items-center gap-2 min-w-0">
+                                                <input type="radio" name="correctOption" value={i} required className="h-4 w-4 flex-shrink-0" defaultChecked={i === 0} />
+                                                <Input name={`option${i}`} placeholder={`Option ${i + 1}`} required className="min-w-0 flex-1 text-sm" />
                                             </div>
                                         ))}
                                     </div>
-                                    <Button type="submit" className="w-full">
+                                    <Button type="submit" className="w-full text-sm sm:text-base">
                                         <Plus className="mr-2 h-4 w-4" /> Add Question
                                     </Button>
                                 </form>
@@ -249,7 +250,7 @@ export default async function ExamEditorPage({
                 </div>
 
                 {/* Sidebar settings */}
-                <div className="space-y-4">
+                <div className="space-y-4 min-w-0">
                     {/* TASK 5: Account Status Card */}
                     <Card className={isPro ? "border-primary/20 bg-primary/5" : ""}>
                         <CardHeader>

@@ -56,20 +56,20 @@ export function EditExamForm({
         return (
             <Card>
                 <CardHeader>
-                    <CardTitle>Exam Details</CardTitle>
+                    <CardTitle className="text-lg sm:text-xl">Exam Details</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                     <div>
                         <p className="text-sm font-medium">Title</p>
-                        <p className="text-sm text-muted-foreground">{initialTitle}</p>
+                        <p className="text-sm text-muted-foreground break-words">{initialTitle}</p>
                     </div>
                     {initialDescription && (
                         <div>
                             <p className="text-sm font-medium">Description</p>
-                            <p className="text-sm text-muted-foreground">{initialDescription}</p>
+                            <p className="text-sm text-muted-foreground break-words">{initialDescription}</p>
                         </div>
                     )}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                         <div>
                             <p className="text-sm font-medium">Duration</p>
                             <p className="text-sm text-muted-foreground">{initialDuration} minutes</p>
@@ -79,7 +79,7 @@ export function EditExamForm({
                             <p className="text-sm text-muted-foreground">{passPercentage}%</p>
                         </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                         <div>
                             <p className="text-sm font-medium">Anti-Cheat</p>
                             <p className="text-sm text-muted-foreground">{antiCheatEnabled ? "Enabled" : "Disabled"}</p>
@@ -98,37 +98,37 @@ export function EditExamForm({
     if (!isEditing) {
         return (
             <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                    <div>
-                        <CardTitle>Exam Settings</CardTitle>
-                        <CardDescription className="mt-1">View and edit exam configuration</CardDescription>
+                <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-0">
+                    <div className="space-y-1">
+                        <CardTitle className="text-lg sm:text-xl">Exam Settings</CardTitle>
+                        <CardDescription className="text-xs sm:text-sm">View and edit exam configuration</CardDescription>
                     </div>
-                    <Button variant="ghost" size="sm" onClick={() => setIsEditing(true)}>
+                    <Button variant="ghost" size="sm" onClick={() => setIsEditing(true)} className="w-full sm:w-auto">
                         <Edit2 className="h-4 w-4 mr-2" />
-                        Edit Settings
+                        <span className="sm:inline">Edit Settings</span>
                     </Button>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     {/* Basic Info */}
                     <div className="space-y-3">
                         <h4 className="font-semibold text-sm flex items-center gap-2">
-                            <Shield className="h-4 w-4" />
+                            <Shield className="h-4 w-4 flex-shrink-0" />
                             Basic Information
                         </h4>
-                        <div className="grid gap-2 text-sm pl-6">
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">Title:</span>
-                                <span className="font-medium">{initialTitle}</span>
+                        <div className="grid gap-2 text-sm pl-0 sm:pl-6">
+                            <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-2">
+                                <span className="text-muted-foreground text-xs sm:text-sm">Title:</span>
+                                <span className="font-medium text-sm break-words sm:text-right">{initialTitle}</span>
                             </div>
                             {initialDescription && (
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Description:</span>
-                                    <span className="font-medium max-w-xs text-right">{initialDescription}</span>
+                                <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-2">
+                                    <span className="text-muted-foreground text-xs sm:text-sm">Description:</span>
+                                    <span className="font-medium text-sm break-words sm:max-w-xs sm:text-right">{initialDescription}</span>
                                 </div>
                             )}
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">Duration:</span>
-                                <span className="font-medium">{initialDuration} minutes</span>
+                            <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-2">
+                                <span className="text-muted-foreground text-xs sm:text-sm">Duration:</span>
+                                <span className="font-medium text-sm">{initialDuration} minutes</span>
                             </div>
                         </div>
                     </div>
@@ -136,18 +136,18 @@ export function EditExamForm({
                     {/* Security */}
                     <div className="space-y-3">
                         <h4 className="font-semibold text-sm flex items-center gap-2">
-                            <Shield className="h-4 w-4" />
+                            <Shield className="h-4 w-4 flex-shrink-0" />
                             Security & Anti-Cheat
                         </h4>
-                        <div className="grid gap-2 text-sm pl-6">
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">Anti-Cheat:</span>
-                                <span className={antiCheatEnabled ? "text-green-600 font-medium" : "text-red-600"}>
+                        <div className="grid gap-2 text-sm pl-0 sm:pl-6">
+                            <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-2">
+                                <span className="text-muted-foreground text-xs sm:text-sm">Anti-Cheat:</span>
+                                <span className={`text-sm font-medium ${antiCheatEnabled ? "text-green-600" : "text-red-600"}`}>
                                     {antiCheatEnabled ? "Enabled" : "Disabled"}
                                 </span>
                             </div>
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">Max Violations:</span>
+                            <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-2">
+                                <span className="text-muted-foreground text-xs sm:text-sm">Max Violations:</span>
                                 <span className="font-medium">{maxViolations}</span>
                             </div>
                             <div className="flex justify-between">
@@ -162,17 +162,17 @@ export function EditExamForm({
                     {/* Grading */}
                     <div className="space-y-3">
                         <h4 className="font-semibold text-sm flex items-center gap-2">
-                            <Target className="h-4 w-4" />
+                            <Target className="h-4 w-4 flex-shrink-0" />
                             Grading & Results
                         </h4>
-                        <div className="grid gap-2 text-sm pl-6">
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">Pass Percentage:</span>
-                                <span className="font-medium">{passPercentage}%</span>
+                        <div className="grid gap-2 text-sm pl-0 sm:pl-6">
+                            <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-2">
+                                <span className="text-muted-foreground text-xs sm:text-sm">Pass Percentage:</span>
+                                <span className="font-medium text-sm">{passPercentage}%</span>
                             </div>
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">Show Results:</span>
-                                <span className="font-medium">{showResultsImmediately ? "Immediately" : "Manual"}</span>
+                            <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-2">
+                                <span className="text-muted-foreground text-xs sm:text-sm">Show Results:</span>
+                                <span className="font-medium text-sm">{showResultsImmediately ? "Immediately" : "Manual"}</span>
                             </div>
                         </div>
                     </div>
@@ -180,19 +180,19 @@ export function EditExamForm({
                     {/* Randomization */}
                     <div className="space-y-3">
                         <h4 className="font-semibold text-sm flex items-center gap-2">
-                            <Shuffle className="h-4 w-4" />
+                            <Shuffle className="h-4 w-4 flex-shrink-0" />
                             Randomization
                         </h4>
-                        <div className="grid gap-2 text-sm pl-6">
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">Shuffle Questions:</span>
-                                <span className={shuffleQuestions ? "text-blue-600 font-medium" : "text-muted-foreground"}>
+                        <div className="grid gap-2 text-sm pl-0 sm:pl-6">
+                            <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-2">
+                                <span className="text-muted-foreground text-xs sm:text-sm">Shuffle Questions:</span>
+                                <span className={`text-sm font-medium ${shuffleQuestions ? "text-blue-600" : "text-muted-foreground"}`}>
                                     {shuffleQuestions ? "Yes" : "No"}
                                 </span>
                             </div>
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">Shuffle Options:</span>
-                                <span className={shuffleOptions ? "text-blue-600 font-medium" : "text-muted-foreground"}>
+                            <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-2">
+                                <span className="text-muted-foreground text-xs sm:text-sm">Shuffle Options:</span>
+                                <span className={`text-sm font-medium ${shuffleOptions ? "text-blue-600" : "text-muted-foreground"}`}>
                                     {shuffleOptions ? "Yes" : "No"}
                                 </span>
                             </div>
@@ -202,26 +202,26 @@ export function EditExamForm({
                     {/* Access Control */}
                     <div className="space-y-3">
                         <h4 className="font-semibold text-sm flex items-center gap-2">
-                            <Lock className="h-4 w-4" />
+                            <Lock className="h-4 w-4 flex-shrink-0" />
                             Access Control
                         </h4>
-                        <div className="grid gap-2 text-sm pl-6">
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">Max Attempts:</span>
-                                <span className="font-medium">{maxAttempts || "Unlimited"}</span>
+                        <div className="grid gap-2 text-sm pl-0 sm:pl-6">
+                            <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-2">
+                                <span className="text-muted-foreground text-xs sm:text-sm">Max Attempts:</span>
+                                <span className="font-medium text-sm">{maxAttempts || "Unlimited"}</span>
                             </div>
                             {(scheduledStartTime || scheduledEndTime) && (
                                 <>
                                     {scheduledStartTime && (
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Start Time:</span>
-                                            <span className="font-medium">{new Date(scheduledStartTime).toLocaleString()}</span>
+                                        <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-2">
+                                            <span className="text-muted-foreground text-xs sm:text-sm">Start Time:</span>
+                                            <span className="font-medium text-sm break-words">{new Date(scheduledStartTime).toLocaleString()}</span>
                                         </div>
                                     )}
                                     {scheduledEndTime && (
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">End Time:</span>
-                                            <span className="font-medium">{new Date(scheduledEndTime).toLocaleString()}</span>
+                                        <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-2">
+                                            <span className="text-muted-foreground text-xs sm:text-sm">End Time:</span>
+                                            <span className="font-medium text-sm break-words">{new Date(scheduledEndTime).toLocaleString()}</span>
                                         </div>
                                     )}
                                 </>
@@ -255,10 +255,10 @@ export function EditExamForm({
         <div className="space-y-4">
             <Card>
                 <CardHeader>
-                    <CardTitle>Edit Exam Settings</CardTitle>
-                    <CardDescription>Modify exam configuration and advanced options</CardDescription>
+                    <CardTitle className="text-lg sm:text-xl">Edit Exam Settings</CardTitle>
+                    <CardDescription className="text-xs sm:text-sm">Modify exam configuration and advanced options</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="px-3 sm:px-6">
                     <form action={handleSubmit} className="space-y-6">
                         {/* Basic Information */}
                         <div className="space-y-4">
@@ -480,8 +480,8 @@ export function EditExamForm({
                         )}
 
                         {/* Action Buttons */}
-                        <div className="flex gap-2 pt-4">
-                            <Button type="submit" disabled={isPending} className="flex-1">
+                        <div className="flex flex-col sm:flex-row gap-2 pt-4">
+                            <Button type="submit" disabled={isPending} className="flex-1 w-full">
                                 {isPending ? (
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                 ) : (
@@ -494,6 +494,7 @@ export function EditExamForm({
                                 variant="outline" 
                                 onClick={() => setIsEditing(false)}
                                 disabled={isPending}
+                                className="w-full sm:w-auto"
                             >
                                 <X className="mr-2 h-4 w-4" />
                                 Cancel

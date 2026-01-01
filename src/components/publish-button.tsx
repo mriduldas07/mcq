@@ -62,34 +62,45 @@ export function PublishButton({ examId, userCredits, isPro, questionCount }: Pub
                 onClick={handlePublish}
                 disabled={isPending || !hasQuestions}
                 variant="default"
-                className="relative"
+                size="sm"
+                className={`relative transition-all ${
+                    isPending 
+                        ? 'bg-green-600 hover:bg-green-700' 
+                        : ''
+                }`}
             >
-                {!canPublish && <Lock className="mr-2 h-4 w-4" />}
-                {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isPending ? "Publishing..." : "Publish Exam"}
-                {!isPro && canPublish && (
-                    <span className="ml-2 text-xs opacity-75">(-1 credit)</span>
+                {!canPublish && <Lock className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />}
+                {isPending && <Loader2 className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" />}
+                <span className="text-xs sm:text-sm">
+                    {isPending ? "Publishing..." : "Publish"}
+                </span>
+                {!isPro && canPublish && !isPending && (
+                    <span className="ml-1 text-[10px] sm:text-xs opacity-75 hidden sm:inline">(-1 credit)</span>
                 )}
             </Button>
 
             <Dialog open={showDialog} onOpenChange={setShowDialog}>
-                <DialogContent>
+                <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <AlertCircle className="h-5 w-5 text-destructive" />
-                            Cannot Publish Exam
+                        <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+                            <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0" />
+                            <span>Cannot Publish Exam</span>
                         </DialogTitle>
-                        <DialogDescription className="pt-4">
+                        <DialogDescription className="pt-3 text-sm">
                             {errorMessage}
                         </DialogDescription>
                     </DialogHeader>
-                    <DialogFooter>
+                    <DialogFooter className="flex-col sm:flex-row gap-2">
                         {!canPublish && (
-                            <Link href="/dashboard/billing">
-                                <Button>Go to Billing</Button>
+                            <Link href="/dashboard/billing" className="w-full sm:w-auto">
+                                <Button className="w-full">Go to Billing</Button>
                             </Link>
                         )}
-                        <Button variant="outline" onClick={() => setShowDialog(false)}>
+                        <Button 
+                            variant="outline" 
+                            onClick={() => setShowDialog(false)}
+                            className="w-full sm:w-auto"
+                        >
                             Close
                         </Button>
                     </DialogFooter>

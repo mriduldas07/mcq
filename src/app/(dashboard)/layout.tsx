@@ -49,13 +49,13 @@ export default async function DashboardLayout({
                     </div>
                 </div>
             </header>
-            <div className="flex-1 w-full">
-                <div className="container px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+            <div className="flex-1 w-full overflow-x-hidden">
+                <div className="container px-4 sm:px-6 lg:px-8 py-4 sm:py-6 max-w-full">
                     <div className="grid gap-6 md:grid-cols-[200px_1fr] lg:gap-8">
-                        <aside className="hidden w-[200px] flex-col md:flex">
+                        <aside className="hidden w-[200px] flex-col md:flex flex-shrink-0">
                             <DashboardNav />
                         </aside>
-                        <main className="flex w-full flex-1 flex-col min-w-0">
+                        <main className="flex w-full flex-1 flex-col min-w-0 overflow-hidden">
                             {children}
                         </main>
                     </div>
