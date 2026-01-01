@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { BarChart, BookOpen, CreditCard, Home, Settings, Library } from "lucide-react";
-import { logoutAction } from "@/actions/auth";
+import { BarChart, BookOpen, Home, Library } from "lucide-react";
 
 const items = [
     {
@@ -26,16 +25,6 @@ const items = [
         title: "Results",
         href: "/dashboard/results",
         icon: BarChart,
-    },
-    {
-        title: "Billing",
-        href: "/dashboard/billing",
-        icon: CreditCard,
-    },
-    {
-        title: "Settings",
-        href: "/dashboard/settings",
-        icon: Settings,
     },
 ];
 
@@ -64,16 +53,6 @@ export function DashboardNav({ onNavigate }: { onNavigate?: () => void }) {
                     </Link>
                 );
             })}
-
-            <form action={logoutAction}>
-                <button 
-                    type="submit"
-                    onClick={onNavigate}
-                    className="w-full text-left group flex items-center rounded-md px-3 py-2 text-sm font-medium hover:bg-red-100 text-red-600"
-                >
-                    <span className="mr-2">🚪</span> Logout
-                </button>
-            </form>
         </nav>
     );
 }

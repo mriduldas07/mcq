@@ -1,23 +1,50 @@
 import { DashboardNav } from "@/components/dashboard-nav";
 import { MobileNav } from "@/components/mobile-nav";
+import { UserAccountNav } from "@/components/user-account-nav";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { verifySession } from "@/lib/session";
+import { prisma } from "@/lib/prisma";
+import { redirect } from "next/navigation";
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
+    const session = await verifySession();
+    if (!session) {
+        redirect("/login");
+    }
+
+    // Fetch user data
+    const user = await prisma.user.findUnique({
+        where: { id: session.userId },
+        select: {
+            name: true,
+            email: true,
+            image: true,
+            planType: true,
+            credits: true,
+        },
+    });
+
+    if (!user) {
+        redirect("/login");
+    }
+
     return (
         <div className="flex min-h-screen flex-col">
-            <header className="sticky top-0 z-40 border-b bg-background">
+            <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
                 <div className="container flex h-14 sm:h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
                     <div className="flex gap-3 sm:gap-4 md:gap-6 items-center">
                         <MobileNav />
-                        <a className="flex items-center font-bold text-base sm:text-lg" href="/">
+                        <a className="flex items-center font-bold text-base sm:text-lg hover:opacity-80 transition-opacity" href="/dashboard">
                             MCQ Platform
                         </a>
                     </div>
-                    <div className="flex items-center space-x-4">
-                        <span className="text-xs sm:text-sm text-muted-foreground hidden sm:inline-block">Teacher Account</span>
+                    <div className="flex items-center gap-2 sm:gap-3">
+                        <ThemeToggle />
+                        <UserAccountNav user={user} />
                     </div>
                 </div>
             </header>
