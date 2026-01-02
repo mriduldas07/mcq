@@ -46,12 +46,12 @@ export default async function Home() {
   return (
     <div className="flex flex-col min-h-screen">
       {/* Navbar */}
-      <header className="px-3 sm:px-4 lg:px-6 h-14 sm:h-16 flex items-center border-b bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50 shadow-sm">
+      <header className="px-3 sm:px-4 lg:px-6 h-14 sm:h-16 flex items-center border-b bg-background/80 backdrop-blur-xl supports-backdrop-filter:bg-background/60 sticky top-0 z-50 shadow-sm">
         <Link className="flex items-center justify-center gap-1.5 sm:gap-2 group" href="#">
-          <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg sm:rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center text-white font-bold text-sm sm:text-base shadow-lg group-hover:shadow-xl transition-shadow">
+          <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg sm:rounded-xl bg-linear-to-br from-blue-600 to-purple-600 flex items-center justify-center text-white font-bold text-sm sm:text-base shadow-lg group-hover:shadow-xl transition-shadow">
             M
           </div>
-          <span className="font-bold text-base sm:text-xl bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">MCQ Platform</span>
+          <span className="font-bold text-base sm:text-xl bg-linear-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">MCQ Platform</span>
         </Link>
         <nav className="ml-auto flex gap-1 sm:gap-2 md:gap-4 items-center">
           <Link className="text-xs sm:text-sm font-medium hover:text-primary transition-colors hidden lg:inline-flex" href="#features">
@@ -91,7 +91,7 @@ export default async function Home() {
         {/* Hero Section */}
         <section className="relative w-full py-12 sm:py-16 md:py-20 lg:py-28 xl:py-36 overflow-hidden bg-background dark:bg-slate-950">
           {/* Background gradients with animation */}
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900"></div>
+          <div className="absolute inset-0 bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900"></div>
           <div className="absolute inset-0 bg-grid-slate-900/[0.04] dark:bg-grid-slate-100/[0.01]"></div>
           {/* Exam doodles background */}
           <ExamDoodleBackground />
@@ -127,7 +127,7 @@ export default async function Home() {
                       <GradientText>Like Never Before</GradientText>
                     </span>
                   </h1>
-                  <p className="mx-auto max-w-[90%] sm:max-w-[700px] text-sm sm:text-base md:text-lg lg:text-xl text-muted-foreground leading-relaxed px-2">
+                  <p className="mx-auto max-w-[90%] sm:max-w-175 text-sm sm:text-base md:text-lg lg:text-xl text-muted-foreground leading-relaxed px-2">
                     The most powerful online exam platform with built-in <span className="font-semibold text-foreground">anti-cheat protection</span>, 
                     instant grading, and real-time analytics. Start creating secure exams in minutes.
                   </p>
@@ -136,7 +136,7 @@ export default async function Home() {
                 {/* CTA Buttons */}
                 <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-2 sm:pt-4 w-full sm:w-auto px-4 sm:px-0">
                   <Link href="/login" className="w-full sm:w-auto">
-                    <Button size="lg" className="w-full sm:w-auto h-12 sm:h-14 px-6 sm:px-10 text-base sm:text-lg font-semibold shadow-2xl hover:shadow-3xl transition-all group glow-on-hover bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+                    <Button size="lg" className="w-full sm:w-auto h-12 sm:h-14 px-6 sm:px-10 text-base sm:text-lg font-semibold shadow-2xl hover:shadow-3xl transition-all group glow-on-hover bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
                       Start for Free
                       <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5 group-hover:translate-x-1 transition-transform" />
                     </Button>
@@ -152,19 +152,19 @@ export default async function Home() {
                 {/* Trust indicators */}
                 <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 lg:gap-8 pt-6 sm:pt-8 text-xs sm:text-sm px-4">
                   <div className="flex items-center gap-2 hover:scale-105 transition-transform">
-                    <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center flex-shrink-0">
+                    <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center shrink-0">
                       <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-600" />
                     </div>
                     <span className="font-medium whitespace-nowrap">No credit card</span>
                   </div>
                   <div className="flex items-center gap-2 hover:scale-105 transition-transform">
-                    <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center flex-shrink-0">
+                    <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center shrink-0">
                       <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-600" />
                     </div>
                     <span className="font-medium whitespace-nowrap">Free forever</span>
                   </div>
                   <div className="flex items-center gap-2 hover:scale-105 transition-transform">
-                    <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center flex-shrink-0">
+                    <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center shrink-0">
                       <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-600" />
                     </div>
                     <span className="font-medium whitespace-nowrap">Cancel anytime</span>
@@ -174,19 +174,19 @@ export default async function Home() {
                 {/* Stats */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 md:gap-6 lg:gap-8 pt-10 sm:pt-12 md:pt-16 w-full max-w-5xl px-2">
                   <div className="space-y-1 sm:space-y-2 p-3 sm:p-4 md:p-5 rounded-lg sm:rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm hover:scale-105 transition-transform border border-transparent dark:border-blue-500/20 dark:hover:border-blue-500/40">
-                    <div className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent">10K+</div>
+                    <div className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold bg-linear-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent">10K+</div>
                     <div className="text-xs sm:text-sm font-medium text-muted-foreground dark:text-slate-300">Active Teachers</div>
                   </div>
                   <div className="space-y-1 sm:space-y-2 p-3 sm:p-4 md:p-5 rounded-lg sm:rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm hover:scale-105 transition-transform border border-transparent dark:border-purple-500/20 dark:hover:border-purple-500/40">
-                    <div className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 dark:from-purple-400 dark:to-pink-400 bg-clip-text text-transparent">500K+</div>
+                    <div className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold bg-linear-to-r from-purple-600 to-pink-600 dark:from-purple-400 dark:to-pink-400 bg-clip-text text-transparent">500K+</div>
                     <div className="text-xs sm:text-sm font-medium text-muted-foreground dark:text-slate-300">Exams Created</div>
                   </div>
                   <div className="space-y-1 sm:space-y-2 p-3 sm:p-4 md:p-5 rounded-lg sm:rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm hover:scale-105 transition-transform border border-transparent dark:border-pink-500/20 dark:hover:border-pink-500/40">
-                    <div className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-pink-600 to-orange-600 dark:from-pink-400 dark:to-orange-400 bg-clip-text text-transparent">2M+</div>
+                    <div className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold bg-linear-to-r from-pink-600 to-orange-600 dark:from-pink-400 dark:to-orange-400 bg-clip-text text-transparent">2M+</div>
                     <div className="text-xs sm:text-sm font-medium text-muted-foreground dark:text-slate-300">Students Tested</div>
                   </div>
                   <div className="space-y-1 sm:space-y-2 p-3 sm:p-4 md:p-5 rounded-lg sm:rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm hover:scale-105 transition-transform border border-transparent dark:border-orange-500/20 dark:hover:border-orange-500/40">
-                    <div className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-orange-600 to-red-600 dark:from-orange-400 dark:to-red-400 bg-clip-text text-transparent">99.9%</div>
+                    <div className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold bg-linear-to-r from-orange-600 to-red-600 dark:from-orange-400 dark:to-red-400 bg-clip-text text-transparent">99.9%</div>
                     <div className="text-xs sm:text-sm font-medium text-muted-foreground dark:text-slate-300">Uptime</div>
                   </div>
                 </div>
@@ -196,7 +196,7 @@ export default async function Home() {
         </section>
 
         {/* Features Section */}
-        <section id="features" className="relative w-full py-12 sm:py-16 md:py-20 lg:py-28 bg-background dark:bg-gradient-to-b dark:from-slate-900 dark:to-slate-950 overflow-hidden">
+        <section id="features" className="relative w-full py-12 sm:py-16 md:py-20 lg:py-28 bg-background dark:bg-linear-to-b dark:from-slate-900 dark:to-slate-950 overflow-hidden">
           <ExamDoodleBackground />
           <div className="container relative px-4 sm:px-6 md:px-8">
             <ScrollReveal>
@@ -205,7 +205,7 @@ export default async function Home() {
                 <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight max-w-3xl px-2">
                   Everything You Need to Run <span className="text-primary">Secure Online Exams</span>
                 </h2>
-                <p className="max-w-[90%] sm:max-w-[700px] text-sm sm:text-base md:text-lg text-muted-foreground px-2">
+                <p className="max-w-[90%] sm:max-w-175 text-sm sm:text-base md:text-lg text-muted-foreground px-2">
                   Powerful features designed to make exam creation, distribution, and grading effortless.
                 </p>
               </div>
@@ -215,9 +215,9 @@ export default async function Home() {
               {/* Feature Card 1 */}
               <StaggeredFade delay={0}>
                 <Card className="border-2 hover:border-primary/50 transition-all hover:shadow-2xl group relative overflow-hidden hover-lift h-full">
-                  <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-transparent dark:from-blue-950/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  <div className="absolute inset-0 bg-linear-to-br from-blue-50 to-transparent dark:from-blue-950/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                   <CardHeader className="relative p-4 sm:p-5 md:p-6">
-                    <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-lg sm:rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 group-hover:rotate-3 transition-all shadow-lg">
+                    <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-lg sm:rounded-xl bg-linear-to-br from-blue-500 to-blue-600 flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 group-hover:rotate-3 transition-all shadow-lg">
                       <Zap className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
                     </div>
                     <CardTitle className="text-lg sm:text-xl group-hover:text-blue-600 transition-colors">Lightning Fast Setup</CardTitle>
@@ -231,9 +231,9 @@ export default async function Home() {
               {/* Feature Card 2 */}
               <StaggeredFade delay={100}>
                 <Card className="border-2 hover:border-primary/50 transition-all hover:shadow-2xl group relative overflow-hidden hover-lift h-full">
-                  <div className="absolute inset-0 bg-gradient-to-br from-red-50 to-transparent dark:from-red-950/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  <div className="absolute inset-0 bg-linear-to-br from-red-50 to-transparent dark:from-red-950/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                   <CardHeader className="relative p-4 sm:p-5 md:p-6">
-                    <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-lg sm:rounded-xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 group-hover:rotate-3 transition-all shadow-lg">
+                    <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-lg sm:rounded-xl bg-linear-to-br from-red-500 to-red-600 flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 group-hover:rotate-3 transition-all shadow-lg">
                       <Shield className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
                     </div>
                     <CardTitle className="text-lg sm:text-xl group-hover:text-red-600 transition-colors">Advanced Anti-Cheat</CardTitle>
@@ -247,9 +247,9 @@ export default async function Home() {
               {/* Feature Card 3 */}
               <StaggeredFade delay={200}>
                 <Card className="border-2 hover:border-primary/50 transition-all hover:shadow-2xl group relative overflow-hidden hover-lift h-full">
-                  <div className="absolute inset-0 bg-gradient-to-br from-green-50 to-transparent dark:from-green-950/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  <div className="absolute inset-0 bg-linear-to-br from-green-50 to-transparent dark:from-green-950/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                   <CardHeader className="relative p-4 sm:p-5 md:p-6">
-                    <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-lg sm:rounded-xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 group-hover:rotate-3 transition-all shadow-lg">
+                    <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-lg sm:rounded-xl bg-linear-to-br from-green-500 to-green-600 flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 group-hover:rotate-3 transition-all shadow-lg">
                       <Timer className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
                     </div>
                     <CardTitle className="text-lg sm:text-xl group-hover:text-green-600 transition-colors">Auto-Grading & Timer</CardTitle>
@@ -263,9 +263,9 @@ export default async function Home() {
               {/* Feature Card 4 */}
               <StaggeredFade delay={300}>
                 <Card className="border-2 hover:border-primary/50 transition-all hover:shadow-2xl group relative overflow-hidden hover-lift h-full">
-                  <div className="absolute inset-0 bg-gradient-to-br from-purple-50 to-transparent dark:from-purple-950/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  <div className="absolute inset-0 bg-linear-to-br from-purple-50 to-transparent dark:from-purple-950/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                   <CardHeader className="relative p-4 sm:p-5 md:p-6">
-                    <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-lg sm:rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 group-hover:rotate-3 transition-all shadow-lg">
+                    <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-lg sm:rounded-xl bg-linear-to-br from-purple-500 to-purple-600 flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 group-hover:rotate-3 transition-all shadow-lg">
                       <BarChart3 className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
                     </div>
                     <CardTitle className="text-lg sm:text-xl group-hover:text-purple-600 transition-colors">Real-Time Analytics</CardTitle>
@@ -279,9 +279,9 @@ export default async function Home() {
               {/* Feature Card 5 */}
               <StaggeredFade delay={400}>
                 <Card className="border-2 hover:border-primary/50 transition-all hover:shadow-2xl group relative overflow-hidden hover-lift h-full">
-                  <div className="absolute inset-0 bg-gradient-to-br from-orange-50 to-transparent dark:from-orange-950/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  <div className="absolute inset-0 bg-linear-to-br from-orange-50 to-transparent dark:from-orange-950/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                   <CardHeader className="relative p-4 sm:p-5 md:p-6">
-                    <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-lg sm:rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 group-hover:rotate-3 transition-all shadow-lg">
+                    <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-lg sm:rounded-xl bg-linear-to-br from-orange-500 to-orange-600 flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 group-hover:rotate-3 transition-all shadow-lg">
                       <Users className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
                     </div>
                     <CardTitle className="text-lg sm:text-xl group-hover:text-orange-600 transition-colors">Unlimited Students</CardTitle>
@@ -295,9 +295,9 @@ export default async function Home() {
               {/* Feature Card 6 */}
               <StaggeredFade delay={500}>
                 <Card className="border-2 hover:border-primary/50 transition-all hover:shadow-2xl group relative overflow-hidden hover-lift h-full">
-                  <div className="absolute inset-0 bg-gradient-to-br from-pink-50 to-transparent dark:from-pink-950/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  <div className="absolute inset-0 bg-linear-to-br from-pink-50 to-transparent dark:from-pink-950/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                   <CardHeader className="relative p-4 sm:p-5 md:p-6">
-                    <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-lg sm:rounded-xl bg-gradient-to-br from-pink-500 to-pink-600 flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 group-hover:rotate-3 transition-all shadow-lg">
+                    <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-lg sm:rounded-xl bg-linear-to-br from-pink-500 to-pink-600 flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 group-hover:rotate-3 transition-all shadow-lg">
                       <Globe className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
                     </div>
                     <CardTitle className="text-lg sm:text-xl group-hover:text-pink-600 transition-colors">Monetization Ready</CardTitle>
@@ -312,7 +312,7 @@ export default async function Home() {
         </section>
 
         {/* How It Works Section */}
-        <section id="how-it-works" className="relative w-full py-12 sm:py-16 md:py-20 lg:py-28 bg-gradient-to-b from-background to-muted/30 dark:from-slate-950 dark:to-slate-900 overflow-hidden">
+        <section id="how-it-works" className="relative w-full py-12 sm:py-16 md:py-20 lg:py-28 bg-linear-to-b from-background to-muted/30 dark:from-slate-950 dark:to-slate-900 overflow-hidden">
           <ExamDoodleBackground />
           <div className="container relative px-4 sm:px-6 md:px-8">
             <ScrollReveal>
@@ -321,7 +321,7 @@ export default async function Home() {
                 <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight max-w-3xl px-2">
                   Get Started in <span className="text-primary">3 Simple Steps</span>
                 </h2>
-                <p className="max-w-[90%] sm:max-w-[700px] text-sm sm:text-base md:text-lg text-muted-foreground px-2">
+                <p className="max-w-[90%] sm:max-w-175 text-sm sm:text-base md:text-lg text-muted-foreground px-2">
                   Create your first exam in minutes and start testing students immediately.
                 </p>
               </div>
@@ -330,7 +330,7 @@ export default async function Home() {
             <div className="max-w-5xl mx-auto grid gap-6 sm:gap-8 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
               <ScrollReveal delay={0}>
                 <div className="relative flex flex-col items-center text-center group px-4">
-                  <div className="h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold text-xl sm:text-2xl mb-3 sm:mb-4 shadow-lg group-hover:scale-110 group-hover:shadow-2xl transition-all">
+                  <div className="h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-linear-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold text-xl sm:text-2xl mb-3 sm:mb-4 shadow-lg group-hover:scale-110 group-hover:shadow-2xl transition-all">
                     1
                   </div>
                   <h3 className="text-lg sm:text-xl font-bold mb-2 group-hover:text-blue-600 transition-colors">Create Your Exam</h3>
@@ -342,7 +342,7 @@ export default async function Home() {
 
               <ScrollReveal delay={200}>
                 <div className="relative flex flex-col items-center text-center group px-4">
-                  <div className="h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center text-white font-bold text-xl sm:text-2xl mb-3 sm:mb-4 shadow-lg group-hover:scale-110 group-hover:shadow-2xl transition-all">
+                  <div className="h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-linear-to-br from-purple-500 to-purple-600 flex items-center justify-center text-white font-bold text-xl sm:text-2xl mb-3 sm:mb-4 shadow-lg group-hover:scale-110 group-hover:shadow-2xl transition-all">
                     2
                   </div>
                   <h3 className="text-lg sm:text-xl font-bold mb-2 group-hover:text-purple-600 transition-colors">Share the Link</h3>
@@ -354,7 +354,7 @@ export default async function Home() {
 
               <ScrollReveal delay={400}>
                 <div className="relative flex flex-col items-center text-center group px-4 sm:col-span-2 md:col-span-1">
-                  <div className="h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-gradient-to-br from-pink-500 to-pink-600 flex items-center justify-center text-white font-bold text-xl sm:text-2xl mb-3 sm:mb-4 shadow-lg group-hover:scale-110 group-hover:shadow-2xl transition-all">
+                  <div className="h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-linear-to-br from-pink-500 to-pink-600 flex items-center justify-center text-white font-bold text-xl sm:text-2xl mb-3 sm:mb-4 shadow-lg group-hover:scale-110 group-hover:shadow-2xl transition-all">
                     3
                   </div>
                   <h3 className="text-lg sm:text-xl font-bold mb-2 group-hover:text-pink-600 transition-colors">View Results</h3>
@@ -377,7 +377,7 @@ export default async function Home() {
                 <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight px-2">
                   Simple, Transparent Pricing
                 </h2>
-                <p className="max-w-[90%] sm:max-w-[700px] text-sm sm:text-base md:text-lg text-muted-foreground px-2">
+                <p className="max-w-[90%] sm:max-w-175 text-sm sm:text-base md:text-lg text-muted-foreground px-2">
                   Start free, scale as you grow. No hidden fees, no surprises.
                 </p>
               </div>
@@ -386,7 +386,7 @@ export default async function Home() {
             <div className="mx-auto grid max-w-lg items-stretch gap-6 sm:gap-8 grid-cols-1 sm:grid-cols-2 sm:max-w-4xl lg:max-w-5xl">
               {/* Free Plan */}
               <Card className="flex flex-col border-2 hover:border-primary/50 transition-all hover:shadow-2xl hover-lift relative overflow-hidden group dark:bg-slate-800/50 dark:border-slate-700 h-full">
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-transparent dark:from-blue-500/10 dark:via-transparent dark:to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div className="absolute inset-0 bg-linear-to-br from-blue-50/50 to-transparent dark:from-blue-500/10 dark:via-transparent dark:to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 <CardHeader className="relative p-4 sm:p-5 md:p-6">
                   <CardTitle className="text-xl sm:text-2xl group-hover:text-blue-600 transition-colors">Pay Per Exam</CardTitle>
                   <CardDescription className="text-sm sm:text-base">Perfect for occasional use and testing the platform</CardDescription>
@@ -433,9 +433,9 @@ export default async function Home() {
 
               {/* Pro Plan */}
               <Card className="flex flex-col border-2 border-primary relative hover:shadow-2xl hover-lift transition-all group overflow-hidden dark:bg-slate-800/70 dark:border-primary/60 dark:shadow-lg dark:shadow-primary/20 h-full">
-                <div className="absolute inset-0 bg-gradient-to-br from-purple-50/50 to-transparent dark:from-purple-500/10 dark:via-blue-500/10 dark:to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div className="absolute inset-0 bg-linear-to-br from-purple-50/50 to-transparent dark:from-purple-500/10 dark:via-blue-500/10 dark:to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 <div className="absolute -top-3 sm:-top-4 left-0 right-0 flex justify-center z-10">
-                  <Badge className="px-3 sm:px-4 py-1 sm:py-1.5 text-xs sm:text-sm bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-xl animate-pulse">
+                  <Badge className="px-3 sm:px-4 py-1 sm:py-1.5 text-xs sm:text-sm bg-linear-to-r from-blue-600 to-purple-600 text-white shadow-xl animate-pulse">
                     <Star className="mr-1 h-3 w-3 sm:h-3.5 sm:w-3.5 fill-yellow-300" />
                     Most Popular
                   </Badge>
@@ -504,9 +504,9 @@ export default async function Home() {
         </section>
 
         {/* Newsletter / CTA Section */}
-        <section className="relative w-full py-12 sm:py-16 md:py-20 lg:py-28 overflow-hidden bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 dark:from-blue-700 dark:via-purple-700 dark:to-pink-700">
+        <section className="relative w-full py-12 sm:py-16 md:py-20 lg:py-28 overflow-hidden bg-linear-to-br from-blue-600 via-purple-600 to-pink-600 dark:from-blue-700 dark:via-purple-700 dark:to-pink-700">
           {/* Animated background pattern */}
-          <div className="absolute inset-0 bg-grid-white/[0.05] bg-[size:30px_30px] dark:bg-grid-white/[0.08]"></div>
+          <div className="absolute inset-0 bg-grid-white/[0.05] bg-size-[30px_30px] dark:bg-grid-white/[0.08]"></div>
           <ParallaxSection speed={0.2}>
             <div className="absolute top-10 left-10 w-48 h-48 sm:w-64 sm:h-64 bg-white/10 rounded-full blur-3xl hidden sm:block"></div>
           </ParallaxSection>
@@ -563,7 +563,7 @@ export default async function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="relative border-t bg-gradient-to-b from-background to-muted/50 dark:from-slate-950 dark:to-slate-900 dark:border-slate-800 overflow-hidden">
+      <footer className="relative border-t bg-linear-to-b from-background to-muted/50 dark:from-slate-950 dark:to-slate-900 dark:border-slate-800 overflow-hidden">
         <ExamDoodleBackground />
         <div className="container relative px-4 sm:px-6 md:px-8 py-12 sm:py-16">
           <ScrollReveal>
@@ -571,10 +571,10 @@ export default async function Home() {
               {/* Brand - Larger column */}
               <div className="space-y-3 sm:space-y-4 lg:col-span-2 sm:col-span-2">
                 <Link className="flex items-center gap-1.5 sm:gap-2 group" href="/">
-                  <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg sm:rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center text-white font-bold text-base sm:text-lg shadow-lg group-hover:shadow-xl transition-shadow">
+                  <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg sm:rounded-xl bg-linear-to-br from-blue-600 to-purple-600 flex items-center justify-center text-white font-bold text-base sm:text-lg shadow-lg group-hover:shadow-xl transition-shadow">
                     M
                   </div>
-                  <span className="font-bold text-lg sm:text-xl bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">MCQ Platform</span>
+                  <span className="font-bold text-lg sm:text-xl bg-linear-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">MCQ Platform</span>
                 </Link>
                 <p className="text-xs sm:text-sm text-muted-foreground max-w-sm leading-relaxed">
                   The most powerful online exam platform for modern educators. Create secure exams with advanced anti-cheat, instant grading, and real-time analytics.

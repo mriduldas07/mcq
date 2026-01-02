@@ -35,7 +35,7 @@ export default async function DashboardLayout({
 
     return (
         <div className="flex min-h-screen flex-col">
-            <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
                 <div className="container flex h-14 sm:h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
                     <div className="flex gap-3 sm:gap-4 md:gap-6 items-center">
                         <MobileNav />
@@ -52,7 +52,7 @@ export default async function DashboardLayout({
             <div className="flex-1 w-full overflow-x-hidden">
                 <div className="container px-4 sm:px-6 lg:px-8 py-4 sm:py-6 max-w-full">
                     <div className="grid gap-6 md:grid-cols-[200px_1fr] lg:gap-8">
-                        <aside className="hidden w-[200px] flex-col md:flex flex-shrink-0">
+                        <aside className="hidden w-50 flex-col md:flex shrink-0">
                             <DashboardNav />
                         </aside>
                         <main className="flex w-full flex-1 flex-col min-w-0 overflow-hidden">

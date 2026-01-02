@@ -222,7 +222,7 @@ export function QuestionBankClient({
                 >
                   {folder.icon && <span className="text-sm sm:text-base">{folder.icon}</span>}
                   <Folder className="w-3 h-3 sm:w-4 sm:h-4" />
-                  <span className="truncate max-w-[100px] sm:max-w-none">{folder.name}</span>
+                  <span className="truncate max-w-25 sm:max-w-none">{folder.name}</span>
                 </Link>
               </div>
             ))}

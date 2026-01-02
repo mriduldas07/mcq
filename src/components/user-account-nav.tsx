@@ -66,7 +66,7 @@ export function UserAccountNav({ user }: UserAccountNavProps) {
                         className="h-10 w-10 rounded-full object-cover"
                     />
                 ) : (
-                    <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm">
+                    <div className="h-10 w-10 rounded-full bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm">
                         {initials}
                     </div>
                 )}
@@ -87,13 +87,13 @@ export function UserAccountNav({ user }: UserAccountNavProps) {
                             className="h-full w-full rounded-full object-cover"
                         />
                     ) : (
-                        <div className="h-full w-full rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm">
+                        <div className="h-full w-full rounded-full bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm">
                             {initials}
                         </div>
                     )}
                 </button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-[300px] sm:w-[350px]">
+            <SheetContent side="right" className="w-75 sm:w-87.5">
                 <SheetTitle className="sr-only">Account Menu</SheetTitle>
                 <div className="flex flex-col h-full">
                     {/* User Info Section */}
@@ -105,7 +105,7 @@ export function UserAccountNav({ user }: UserAccountNavProps) {
                                 className="h-20 w-20 rounded-full object-cover mb-3"
                             />
                         ) : (
-                            <div className="h-20 w-20 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-2xl mb-3">
+                            <div className="h-20 w-20 rounded-full bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-2xl mb-3">
                                 {initials}
                             </div>
                         )}
@@ -119,7 +119,7 @@ export function UserAccountNav({ user }: UserAccountNavProps) {
                         {/* Plan Badge */}
                         <div className="mt-3 flex items-center gap-2">
                             {user.planType === "PRO" ? (
-                                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-purple-500 to-pink-500 text-white">
+                                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-linear-to-r from-purple-500 to-pink-500 text-white">
                                     ⭐ PRO Plan
                                 </span>
                             ) : (

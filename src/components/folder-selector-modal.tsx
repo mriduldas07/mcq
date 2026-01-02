@@ -112,7 +112,7 @@ export function FolderSelectorModal({
                 e.stopPropagation();
                 toggleFolder(folder.id);
               }}
-              className="flex-shrink-0 w-5 h-5 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+              className="shrink-0 w-5 h-5 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
             >
               {isExpanded ? (
                 <ChevronDown className="w-4 h-4" />
@@ -124,7 +124,7 @@ export function FolderSelectorModal({
           {!hasSubfolders && <div className="w-5" />}
 
           {/* Folder Icon */}
-          <div className="flex-shrink-0">
+          <div className="shrink-0">
             {folder.icon ? (
               <span className="text-lg">{folder.icon}</span>
             ) : isExpanded ? (
@@ -149,7 +149,7 @@ export function FolderSelectorModal({
 
           {/* Selected Check */}
           {isSelected && (
-            <Check className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+            <Check className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0" />
           )}
 
           {/* Create Subfolder Button (on hover) */}
@@ -159,7 +159,7 @@ export function FolderSelectorModal({
                 e.stopPropagation();
                 startCreatingInFolder(folder.id);
               }}
-              className="flex-shrink-0 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+              className="shrink-0 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded opacity-0 group-hover:opacity-100 transition-opacity"
               title="Create subfolder"
             >
               <FolderPlus className="w-4 h-4" />

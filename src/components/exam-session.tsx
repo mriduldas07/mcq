@@ -633,7 +633,7 @@ export function ExamSession({
             {/* Main Content */}
             <main className="flex-1 container mx-auto p-4 md:p-8 max-w-3xl">
                 {questions.length > 0 ? (
-                    <Card className="min-h-[400px] flex flex-col">
+                    <Card className="min-h-100 flex flex-col">
                         <CardHeader>
                             <div className="flex justify-between items-center mb-4">
                                 <span className="text-sm font-medium text-muted-foreground">
