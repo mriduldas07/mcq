@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, BookOpen, Trash2, Plus, Folder, FolderOpen, ChevronRight, Home, FolderPlus } from "lucide-react";
+import { Search, BookOpen, Trash2, Plus, Folder, FolderOpen, ChevronRight, Home, FolderPlus, FolderInput } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { deleteQuestionBankAction } from "@/actions/question-bank";
-import { createFolder, deleteFolder } from "@/actions/folder";
+import { deleteQuestionBankAction, moveQuestionsToFolderAction } from "@/actions/question-bank";
+import { createFolder, deleteFolder, getFolderTree, type FolderWithChildren } from "@/actions/folder";
+import { FolderSelectorModal } from "@/components/folder-selector-modal";
 import Link from "next/link";
 
 interface QuestionBankItem {
@@ -70,6 +71,12 @@ export function QuestionBankClient({
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [creatingFolder, setCreatingFolder] = useState(false);
+  const [showMoveModal, setShowMoveModal] = useState(false);
+  const [movingQuestionId, setMovingQuestionId] = useState<string | null>(null);
+  const [selectedFolderForMove, setSelectedFolderForMove] = useState<string | null>(null);
+  const [allFolders, setAllFolders] = useState<FolderWithChildren[]>([]);
+  const [loadingFolders, setLoadingFolders] = useState(false);
+  const [isMoving, setIsMoving] = useState(false);
 
   // Get subfolders of current folder
   const subfolders = useMemo(() => {
@@ -143,6 +150,51 @@ export function QuestionBankClient({
       router.refresh();
     } catch (error: any) {
       alert(error.message || "Failed to delete folder");
+    }
+  };
+
+  const loadFolders = useCallback(async () => {
+    setLoadingFolders(true);
+    try {
+      const folderTree = await getFolderTree();
+      setAllFolders(folderTree);
+    } catch (error) {
+      console.error("Failed to load folders:", error);
+    } finally {
+      setLoadingFolders(false);
+    }
+  }, []);
+
+  const handleMoveClick = (questionId: string, currentFolderId: string | null) => {
+    setMovingQuestionId(questionId);
+    setSelectedFolderForMove(currentFolderId);
+    setShowMoveModal(true);
+    loadFolders();
+  };
+
+  const handleMoveQuestion = async () => {
+    if (!movingQuestionId) return;
+
+    setIsMoving(true);
+    try {
+      const result = await moveQuestionsToFolderAction([movingQuestionId], selectedFolderForMove);
+      if (result.success) {
+        setShowMoveModal(false);
+        router.refresh();
+      }
+    } catch (error: any) {
+      alert("❌ " + (error.message || "Failed to move question"));
+    } finally {
+      setIsMoving(false);
+    }
+  };
+
+  const handleCreateFolderFromModal = async (name: string, parentId: string | null) => {
+    try {
+      await createFolder({ name, parentId });
+      await loadFolders(); // Reload folders after creating
+    } catch (error: any) {
+      throw new Error(error.message || "Failed to create folder");
     }
   };
 
@@ -492,6 +544,30 @@ export function QuestionBankClient({
           ))
         )}
       </div>
+
+      {/* Move to Folder Modal */}
+      <FolderSelectorModal
+        open={showMoveModal}
+        onOpenChange={(open) => {
+          if (!open) {
+            if (showMoveModal) {
+              handleMoveQuestion();
+            }
+          }
+          setShowMoveModal(open);
+          if (!open) {
+            setMovingQuestionId(null);
+            setSelectedFolderForMove(null);
+          }
+        }}
+        folders={allFolders}
+        selectedFolderId={selectedFolderForMove}
+        onSelectFolder={setSelectedFolderForMove}
+        onCreateFolder={handleCreateFolderFromModal}
+        loading={isMoving || loadingFolders}
+        title="Move to Folder"
+        description="Select a folder to move this question"
+      />
     </div>
   );
 }

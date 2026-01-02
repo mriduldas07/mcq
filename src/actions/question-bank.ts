@@ -198,6 +198,69 @@ export async function addTagsToQuestionsAction(
 }
 
 /**
+ * Move questions to a folder
+ */
+export async function moveQuestionsToFolderAction(
+  questionIds: string[],
+  folderId: string | null
+) {
+  "use server";
+
+  const session = await verifySession();
+  if (!session?.userId) {
+    throw new Error("Unauthorized");
+  }
+
+  try {
+    // Verify ownership of all questions
+    const questions = await prisma.questionBank.findMany({
+      where: {
+        id: { in: questionIds },
+        teacherId: session.userId,
+      },
+    });
+
+    if (questions.length !== questionIds.length) {
+      throw new Error("Some questions not found or unauthorized");
+    }
+
+    // If moving to a folder, verify folder ownership
+    if (folderId) {
+      const folder = await prisma.questionFolder.findUnique({
+        where: { id: folderId },
+        select: { teacherId: true, name: true },
+      });
+
+      if (!folder) {
+        throw new Error("Folder not found");
+      }
+
+      if (folder.teacherId !== session.userId) {
+        throw new Error("Unauthorized");
+      }
+    }
+
+    // Update all questions
+    await prisma.questionBank.updateMany({
+      where: {
+        id: { in: questionIds },
+        teacherId: session.userId,
+      },
+      data: {
+        folderId: folderId,
+        updatedAt: new Date(),
+      },
+    });
+
+    revalidatePath("/dashboard/question-bank");
+    return { success: true, moved: questionIds.length };
+  } catch (error: any) {
+    console.error("Move questions to folder error:", error);
+    throw new Error(error.message || "Failed to move questions");
+  }
+}
+
+/**
  * Duplicate questions in the question bank
  */
 export async function duplicateQuestionsAction(questionIds: string[]) {

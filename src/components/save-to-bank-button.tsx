@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { BookmarkPlus, BookmarkCheck, Loader2, Folder } from "lucide-react";
-import { saveToQuestionBankAction } from "@/actions/question-bank";
+import { BookmarkPlus, BookmarkCheck, Loader2, Folder, FolderInput } from "lucide-react";
+import { saveToQuestionBankAction, moveQuestionsToFolderAction } from "@/actions/question-bank";
 import { getFolderTree, createFolder, type FolderWithChildren } from "@/actions/folder";
 import { FolderSelectorModal } from "@/components/folder-selector-modal";
 import { useRouter } from "next/navigation";
@@ -14,6 +14,7 @@ interface SaveToBankButtonProps {
   variant?: "default" | "outline" | "ghost";
   size?: "default" | "sm" | "lg" | "icon";
   initialStatus?: QuestionBankStatus;
+  questionBankId?: string; // ID in question bank for moving
 }
 
 interface QuestionBankStatus {
@@ -22,14 +23,37 @@ interface QuestionBankStatus {
   folderId?: string;
 }
 
-export function SaveToBankButton({ examId, questionId, variant = "outline", size = "sm", initialStatus }: SaveToBankButtonProps) {
+export function SaveToBankButton({ examId, questionId, variant = "outline", size = "sm", initialStatus, questionBankId }: SaveToBankButtonProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [isMoving, setIsMoving] = useState(false);
   const [folders, setFolders] = useState<FolderWithChildren[]>([]);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [loadingFolders, setLoadingFolders] = useState(false);
   const [bankStatus, setBankStatus] = useState<QuestionBankStatus>(initialStatus || { inBank: false });
+  const [tooltipPosition, setTooltipPosition] = useState<"top" | "bottom">("top");
+  const buttonRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+
+  // Update bank status when initialStatus changes (after page refresh)
+  useEffect(() => {
+    if (initialStatus) {
+      setBankStatus(initialStatus);
+    }
+  }, [initialStatus]);
+
+  // Check if tooltip should appear above or below
+  useEffect(() => {
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      // If button is in top 150px of viewport, show tooltip below
+      if (rect.top < 150) {
+        setTooltipPosition("bottom");
+      } else {
+        setTooltipPosition("top");
+      }
+    }
+  }, []);
 
   const loadFolders = useCallback(async () => {
     setLoadingFolders(true);
@@ -62,25 +86,33 @@ export function SaveToBankButton({ examId, questionId, variant = "outline", size
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const result = await saveToQuestionBankAction(examId, questionId, selectedFolderId);
-      
-      if (result.alreadyExists) {
-        // Question already in bank - show info message
-        alert("ℹ️ " + result.message);
-      } else if (result.success) {
-        // Successfully saved - show success message
-        alert("✅ " + result.message);
-        setShowModal(false);
-        // Update local state to reflect the change
-        setBankStatus({ inBank: true, folderId: selectedFolderId || undefined });
+      if (isMoving && questionBankId) {
+        // Moving existing question to different folder
+        const result = await moveQuestionsToFolderAction([questionBankId], selectedFolderId);
+        if (result.success) {
+          setShowModal(false);
+          router.refresh();
+        }
       } else {
-        // Some other issue
-        alert(result.message);
+        // Saving new question to bank
+        const result = await saveToQuestionBankAction(examId, questionId, selectedFolderId);
+        
+        if (result.alreadyExists) {
+          // Already exists, just close
+          setShowModal(false);
+        } else if (result.success) {
+          setShowModal(false);
+          setBankStatus({ inBank: true, folderId: selectedFolderId || undefined });
+          router.refresh();
+        } else {
+          alert(result.message);
+        }
       }
     } catch (error: any) {
-      alert("❌ " + (error.message || "Failed to save question"));
+      alert("❌ " + (error.message || isMoving ? "Failed to move question" : "Failed to save question"));
     } finally {
       setIsSaving(false);
+      setIsMoving(false);
     }
   };
 
@@ -93,18 +125,21 @@ export function SaveToBankButton({ examId, questionId, variant = "outline", size
 
   return (
     <>
-      <div className="relative group inline-block">
+      <div ref={buttonRef} className="relative inline-block">
         <Button
           type="button"
           variant={getButtonVariant()}
           size={size}
           onClick={() => {
-            if (!bankStatus.inBank) {
-              setShowModal(true);
+            if (bankStatus.inBank) {
+              // Already saved - open modal to move to different folder
+              setIsMoving(true);
+              setSelectedFolderId(bankStatus.folderId || null);
             }
+            setShowModal(true);
           }}
-          disabled={isSaving || bankStatus.inBank}
-          className={bankStatus.inBank ? "bg-green-600 hover:bg-green-600 text-white cursor-not-allowed opacity-80" : ""}
+          disabled={isSaving}
+          className={bankStatus.inBank ? "bg-green-600 hover:bg-green-600/90 text-white" : ""}
         >
           {isSaving ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -114,37 +149,21 @@ export function SaveToBankButton({ examId, questionId, variant = "outline", size
             <BookmarkPlus className="h-4 w-4" />
           )}
         </Button>
-        
-        {/* Custom Tooltip */}
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50 pointer-events-none">
-          <div className="flex flex-col gap-1">
-            <p className="font-semibold">
-              {bankStatus.inBank ? "Already in Question Bank" : "Save to Question Bank"}
-            </p>
-            {bankStatus.inBank && bankStatus.folderName && (
-              <div className="flex items-center gap-1 text-xs text-gray-300">
-                <Folder className="h-3 w-3" />
-                <span>Folder: {bankStatus.folderName}</span>
-              </div>
-            )}
-          </div>
-          {/* Tooltip arrow */}
-          <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></div>
-        </div>
       </div>
 
       <FolderSelectorModal
         open={showModal}
         onOpenChange={(open) => {
           if (!open) {
-            // When closing modal, save the question
+            // When closing modal, save or move the question
             if (showModal) {
               handleSave();
             }
           }
           setShowModal(open);
           if (!open) {
-            setSelectedFolderId(null); // Reset selection when closing
+            setSelectedFolderId(null);
+            setIsMoving(false);
           }
         }}
         folders={folders}
@@ -152,6 +171,8 @@ export function SaveToBankButton({ examId, questionId, variant = "outline", size
         onSelectFolder={setSelectedFolderId}
         onCreateFolder={handleCreateFolder}
         loading={isSaving || loadingFolders}
+        title={isMoving ? "Move to Folder" : "Save to Question Bank"}
+        description={isMoving ? "Select a folder to move this question" : "Select a folder or save to root"}
       />
     </>
   );

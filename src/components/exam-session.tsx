@@ -145,9 +145,14 @@ export function ExamSession({
         }
     };
 
-    // TASK 1: SERVER-CONTROLLED TIMER
-    // Calculate remaining time from server endTime
+    // TASK 1: SERVER-CONTROLLED TIMER - Only start when user enters fullscreen
     useEffect(() => {
+        // Don't start timer if anti-cheat is enabled and user hasn't entered fullscreen
+        if (antiCheatEnabled && !hasEnteredFullscreen.current) {
+            console.log('⏸️ Timer paused - waiting for user to enter fullscreen');
+            return;
+        }
+
         const calculateTimeLeft = () => {
             const now = new Date().getTime();
             const end = new Date(endTime).getTime();
@@ -157,9 +162,16 @@ export function ExamSession({
 
         // Set initial time
         setTimeLeft(calculateTimeLeft());
+        console.log('✅ Timer started!');
 
-        // Update every second
+        // Update every second ONLY when in fullscreen (or anti-cheat disabled)
         const timer = setInterval(() => {
+            // Pause timer if user exits fullscreen
+            if (antiCheatEnabled && !document.fullscreenElement) {
+                console.log('⏸️ Timer paused - user exited fullscreen');
+                return;
+            }
+
             const remaining = calculateTimeLeft();
             setTimeLeft(remaining);
 
@@ -169,7 +181,7 @@ export function ExamSession({
         }, 1000);
 
         return () => clearInterval(timer);
-    }, [endTime]);
+    }, [endTime, antiCheatEnabled, isFullscreen]);
 
     // Handle page refresh - restore attempt state (ONE TIME ONLY)
     useEffect(() => {
@@ -242,12 +254,17 @@ export function ExamSession({
                         setViolations(result.violations);
                         console.log(`Server recorded violation. Count: ${result.violations}/${maxViolations}`);
                         
-                        // Only auto-submit if TRULY exceeded max violations
+                        // Check if should auto-submit
+                        console.log(`🔍 Checking auto-submit: violations=${result.violations}, max=${maxViolations}, hasAutoSubmitted=${hasAutoSubmitted.current}`);
+                        
                         if (result.violations >= maxViolations && !hasAutoSubmitted.current) {
-                            console.log(`🚨 Max violations (${result.violations}/${maxViolations}) reached - auto-submitting`);
+                            console.log(`🚨🚨🚨 TAB SWITCH - EXCEEDED LIMIT (${result.violations}/${maxViolations}) - FORCE AUTO-SUBMIT NOW! 🚨🚨🚨`);
                             hasAutoSubmitted.current = true;
-                            alert(`Too many violations detected (${result.violations}/${maxViolations}). Exam is being auto-submitted.`);
-                            await handleSubmit(true);
+                            
+                            // Submit immediately - no delay needed
+                            handleSubmit(true);
+                        } else if (result.violations >= maxViolations) {
+                            console.log(`⚠️ Already flagged for auto-submit, waiting...`);
                         }
                     }
                 } catch (e) {
@@ -317,12 +334,17 @@ export function ExamSession({
                         setViolations(result.violations);
                         console.log(`Server recorded violation. Count: ${result.violations}/${maxViolations}`);
                         
-                        // Only auto-submit if TRULY exceeded max violations
+                        // Check if should auto-submit
+                        console.log(`🔍 Checking auto-submit: violations=${result.violations}, max=${maxViolations}, hasAutoSubmitted=${hasAutoSubmitted.current}`);
+                        
                         if (result.violations >= maxViolations && !hasAutoSubmitted.current) {
-                            console.log(`🚨 Max violations (${result.violations}/${maxViolations}) reached - auto-submitting`);
+                            console.log(`🚨🚨🚨 FULLSCREEN EXIT - EXCEEDED LIMIT (${result.violations}/${maxViolations}) - FORCE AUTO-SUBMIT NOW! 🚨🚨🚨`);
                             hasAutoSubmitted.current = true;
-                            alert(`Too many violations detected (${result.violations}/${maxViolations}). Exam is being auto-submitted.`);
-                            await handleSubmit(true);
+                            
+                            // Submit immediately - no delay needed
+                            handleSubmit(true);
+                        } else if (result.violations >= maxViolations) {
+                            console.log(`⚠️ Already flagged for auto-submit, waiting...`);
                         }
                     }
                 } catch (e) {
@@ -330,10 +352,18 @@ export function ExamSession({
                 }
             } else {
                 // User entered fullscreen
+                const wasFirstEntry = !hasEnteredFullscreen.current;
+                
                 setIsFullscreen(true);
                 setShowFullscreenPrompt(false);
-                hasEnteredFullscreen.current = true; // Mark that user has entered fullscreen
-                console.log('✅ User entered fullscreen - exam can now begin');
+                
+                // Mark that user has entered fullscreen
+                if (wasFirstEntry) {
+                    hasEnteredFullscreen.current = true;
+                    console.log('✅ User entered fullscreen for the first time - timer will start now!');
+                } else {
+                    console.log('✅ User re-entered fullscreen - timer resuming');
+                }
             }
         };
 
@@ -416,11 +446,18 @@ export function ExamSession({
     };
 
     const handleSubmit = async (auto = false) => {
-        if (isSubmitting) return;
+        if (isSubmitting) {
+            console.log('⚠️ Already submitting, ignoring duplicate call');
+            return;
+        }
+
+        console.log(auto ? '🤖 AUTO-SUBMITTING exam (violations or timer)' : '✅ MANUAL submission by user');
 
         // TASK 8: Block submission if offline with pending saves
         if (!isOnline && pendingSaves.length > 0) {
-            alert("Cannot submit exam while offline. Please wait for connection to sync your answers.");
+            if (!auto) {
+                alert("Cannot submit exam while offline. Please wait for connection to sync your answers.");
+            }
             return;
         }
 
@@ -428,7 +465,7 @@ export function ExamSession({
 
         try {
             // CRITICAL FIX: Save all current answers before submitting (especially for auto-submit)
-            console.log('💾 Saving all answers before submission...', { answers, auto });
+            console.log('💾 Saving all answers before submission...', { answerCount: Object.keys(answers).length, auto });
             
             // Save each answer to ensure server has latest data
             const answerEntries = Object.entries(answers);
@@ -451,19 +488,25 @@ export function ExamSession({
             const result = await submitExamAction(attemptId);
             
             if (result.success) {
-                console.log('🎉 Exam submitted successfully:', result);
+                console.log('🎉 Exam submitted successfully - redirecting to results');
                 // TASK 8: Clear local storage after successful submission
                 const storageKey = `exam_${attemptId}_answers`;
                 localStorage.removeItem(storageKey);
                 
-                router.push(`/exam/${examId}/result?attemptId=${attemptId}`);
+                // Use replace instead of push for smoother transition (no back button issues)
+                router.replace(`/exam/${examId}/result?attemptId=${attemptId}`);
             } else {
-                alert(result.error || "Submission failed");
+                console.error('❌ Submission failed:', result.error);
+                if (!auto) {
+                    alert(result.error || "Submission failed");
+                }
                 setIsSubmitting(false);
             }
         } catch (e) {
-            console.error("Submit failed", e);
-            alert("An error occurred during submission. Please try again.");
+            console.error("❌ Submit exception:", e);
+            if (!auto) {
+                alert("An error occurred during submission. Please try again.");
+            }
             setIsSubmitting(false);
         }
     };

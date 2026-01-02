@@ -16,6 +16,8 @@ interface FolderSelectorModalProps {
   onSelectFolder: (folderId: string | null) => void;
   onCreateFolder: (name: string, parentId: string | null) => Promise<void>;
   loading?: boolean;
+  title?: string;
+  description?: string;
 }
 
 export function FolderSelectorModal({
@@ -26,6 +28,8 @@ export function FolderSelectorModal({
   onSelectFolder,
   onCreateFolder,
   loading = false,
+  title = "Select Folder",
+  description = "Choose a folder for your question",
 }: FolderSelectorModalProps) {
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [isCreating, setIsCreating] = useState(false);
@@ -206,9 +210,9 @@ export function FolderSelectorModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Save to Folder</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
-            Select a folder to organize your question, or create a new one.
+            {description}
           </DialogDescription>
         </DialogHeader>
 

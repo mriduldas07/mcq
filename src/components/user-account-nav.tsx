@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { LogOut, Settings, CreditCard, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,13 @@ interface UserAccountNavProps {
 
 export function UserAccountNav({ user }: UserAccountNavProps) {
     const [open, setOpen] = useState(false);
+    const [mounted, setMounted] = useState(false);
     const router = useRouter();
+
+    // Prevent hydration mismatch
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     const handleLogout = async () => {
         await logoutAction();
@@ -44,6 +50,29 @@ export function UserAccountNav({ user }: UserAccountNavProps) {
               .toUpperCase()
               .slice(0, 2)
         : user.email?.[0]?.toUpperCase() || "U";
+
+    // Return placeholder during SSR to prevent hydration mismatch
+    if (!mounted) {
+        return (
+            <Button
+                variant="ghost"
+                className="relative h-10 w-10 rounded-full"
+                disabled
+            >
+                {user.image ? (
+                    <img
+                        src={user.image}
+                        alt={user.name || "User"}
+                        className="h-10 w-10 rounded-full object-cover"
+                    />
+                ) : (
+                    <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm">
+                        {initials}
+                    </div>
+                )}
+            </Button>
+        );
+    }
 
     return (
         <Sheet open={open} onOpenChange={setOpen}>

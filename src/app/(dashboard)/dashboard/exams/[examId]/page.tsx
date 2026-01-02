@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Plus, AlertCircle } from "lucide-react";
 import { addQuestionAction } from "@/actions/exam";
 import { CopyLinkButton } from "@/components/copy-link-button";
@@ -64,6 +65,7 @@ export default async function ExamEditorPage({
             text: { in: questionTexts },
         },
         select: {
+            id: true,
             text: true,
             folderId: true,
             folder: {
@@ -80,7 +82,8 @@ export default async function ExamEditorPage({
         questionsInBank.map(q => [q.text, { 
             inBank: true, 
             folderId: q.folderId || undefined, 
-            folderName: q.folder?.name 
+            folderName: q.folder?.name,
+            questionBankId: q.id
         }])
     );
 
@@ -91,7 +94,7 @@ export default async function ExamEditorPage({
         <div className="flex-1 space-y-4 sm:space-y-6 overflow-hidden w-full max-w-full">
             {/* Header Section */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 min-w-0">
-                <h2 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight break-words pr-2">{exam.title}</h2>
+                <h2 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight wrap-break-word pr-2">{exam.title}</h2>
                 <div className="flex flex-wrap items-center gap-2">
                     {exam.status === 'PUBLISHED' && <CopyLinkButton examId={examId} />}
                     <span className="text-xs sm:text-sm text-muted-foreground uppercase font-semibold whitespace-nowrap">{exam.status}</span>
@@ -114,7 +117,7 @@ export default async function ExamEditorPage({
                 <Card className="border-orange-200 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-900">
                     <CardContent className="p-4 sm:pt-6">
                         <div className="flex flex-col sm:flex-row items-start gap-3">
-                            <AlertCircle className="h-5 w-5 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
+                            <AlertCircle className="h-5 w-5 text-orange-600 dark:text-orange-400 mt-0.5 shrink-0" />
                             <div className="flex-1 space-y-2">
                                 <h3 className="font-semibold text-orange-900 dark:text-orange-300 text-sm sm:text-base">No Credits Available</h3>
                                 <p className="text-xs sm:text-sm text-orange-700 dark:text-orange-400">
@@ -135,7 +138,7 @@ export default async function ExamEditorPage({
                 <Card className="border-yellow-200 bg-yellow-50 dark:bg-yellow-950/20 dark:border-yellow-900">
                     <CardContent className="p-4 sm:pt-6">
                         <div className="flex flex-col sm:flex-row items-start gap-3">
-                            <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
+                            <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5 shrink-0" />
                             <div className="flex-1 space-y-2">
                                 <h3 className="font-semibold text-yellow-900 dark:text-yellow-300 text-sm sm:text-base">Low Credits</h3>
                                 <p className="text-xs sm:text-sm text-yellow-700 dark:text-yellow-400">
@@ -174,29 +177,45 @@ export default async function ExamEditorPage({
                                 }
                                 
                                 return (
-                                    <Card key={q.id} className="overflow-hidden">
+                                    <Card key={q.id} className="overflow-visible">
                                         <CardHeader className="p-3 sm:p-4">
                                             <div className="flex justify-between items-start gap-2 min-w-0">
-                                                <span className="font-semibold text-sm flex-shrink-0">Q{i + 1}</span>
-                                                <div className="flex gap-2 flex-shrink-0">
+                                                <div className="flex flex-col gap-2 flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-semibold text-sm shrink-0">Q{i + 1}</span>
+                                                        {bankStatusMap.get(q.text)?.inBank && bankStatusMap.get(q.text)?.folderName && (
+                                                            <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                                                <span>📁</span>
+                                                                <span>{bankStatusMap.get(q.text)?.folderName}</span>
+                                                            </Badge>
+                                                        )}
+                                                        {bankStatusMap.get(q.text)?.inBank && !bankStatusMap.get(q.text)?.folderName && (
+                                                            <Badge variant="outline" className="text-xs text-muted-foreground">
+                                                                Saved (No folder)
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-sm sm:text-base wrap-break-word overflow-wrap-anywhere">{q.text}</p>
+                                                </div>
+                                                <div className="flex gap-2 shrink-0">
                                                     <SaveToBankButton 
                                                         examId={examId} 
                                                         questionId={q.id}
                                                         initialStatus={bankStatusMap.get(q.text) || { inBank: false }}
+                                                        questionBankId={bankStatusMap.get(q.text)?.questionBankId}
                                                     />
                                                     {exam.status !== 'PUBLISHED' && (
                                                         <DeleteQuestionButton questionId={q.id} examId={examId} />
                                                     )}
                                                 </div>
                                             </div>
-                                            <p className="mt-2 text-sm sm:text-base break-words overflow-wrap-anywhere">{q.text}</p>
                                         </CardHeader>
                                         <CardContent className="pt-0 pb-3 sm:pb-4 px-3 sm:px-4">
                                             <div className="space-y-1 min-w-0">
                                                 {options.map((opt) => (
                                                     <div 
                                                         key={opt.id} 
-                                                        className={`text-xs sm:text-sm px-2 sm:px-3 py-1.5 rounded break-words overflow-wrap-anywhere ${
+                                                        className={`text-xs sm:text-sm px-2 sm:px-3 py-1.5 rounded wrap-break-word overflow-wrap-anywhere ${
                                                             opt.id === q.correctOption 
                                                                 ? 'bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 font-medium' 
                                                                 : 'text-muted-foreground'
@@ -235,7 +254,7 @@ export default async function ExamEditorPage({
                                         <Label className="text-xs sm:text-sm">Options (select the correct answer)</Label>
                                         {[0, 1, 2, 3].map((i) => (
                                             <div key={i} className="flex items-center gap-2 min-w-0">
-                                                <input type="radio" name="correctOption" value={i} required className="h-4 w-4 flex-shrink-0" defaultChecked={i === 0} />
+                                                <input type="radio" name="correctOption" value={i} required className="h-4 w-4 shrink-0" defaultChecked={i === 0} />
                                                 <Input name={`option${i}`} placeholder={`Option ${i + 1}`} required className="min-w-0 flex-1 text-sm" />
                                             </div>
                                         ))}
