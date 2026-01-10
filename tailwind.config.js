@@ -15,6 +15,10 @@ module.exports = {
             },
         },
         extend: {
+            fontFamily: {
+                sans: ["var(--font-satoshi)", "system-ui", "sans-serif"],
+                display: ["var(--font-clash-display)", "system-ui", "sans-serif"],
+            },
             colors: {
                 border: "hsl(var(--border))",
                 input: "hsl(var(--input))",

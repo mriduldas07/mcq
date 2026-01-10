@@ -75,7 +75,7 @@ export function SettingsClient({ user }: SettingsClientProps) {
                                         className="h-20 w-20 rounded-full object-cover ring-2 ring-offset-2 ring-primary/20"
                                     />
                                 ) : (
-                                    <div className="h-20 w-20 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-2xl ring-2 ring-offset-2 ring-primary/20">
+                                    <div className="h-20 w-20 rounded-full bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-2xl ring-2 ring-offset-2 ring-primary/20">
                                         {name
                                             ? name
                                                   .split(" ")
@@ -162,7 +162,7 @@ export function SettingsClient({ user }: SettingsClientProps) {
                             <p className="text-sm font-medium text-muted-foreground">Plan Type</p>
                             <div className="mt-1">
                                 {user.planType === "PRO" ? (
-                                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-purple-500 to-pink-500 text-white">
+                                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-linear-to-r from-purple-500 to-pink-500 text-white">
                                         ⭐ PRO Plan
                                     </span>
                                 ) : (
@@ -207,7 +207,7 @@ export function SettingsClient({ user }: SettingsClientProps) {
                 <CardContent className="space-y-4">
                     <div className="p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded-lg">
                         <div className="flex items-start gap-3">
-                            <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                            <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
                             <div className="flex-1">
                                 <h4 className="font-semibold text-sm text-red-900 dark:text-red-300">
                                     Delete Account

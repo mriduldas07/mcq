@@ -4,7 +4,7 @@ export default function ResultsLoading() {
   return (
     <div className="flex-1 space-y-8">
       {/* Hero Section */}
-      <div className="rounded-xl bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-blue-950/30 dark:via-indigo-950/30 dark:to-purple-950/30 p-8 border">
+      <div className="rounded-xl bg-linear-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-blue-950/30 dark:via-indigo-950/30 dark:to-purple-950/30 p-8 border">
         <Skeleton className="h-12 w-64 mb-4" />
         <Skeleton className="h-6 w-96" />
       </div>

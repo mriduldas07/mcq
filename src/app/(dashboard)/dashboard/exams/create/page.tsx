@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { createExamAction } from "@/actions/exam";
 import Link from "next/link";
-import { Shield, Clock, Settings, Lock, Target, Shuffle, Calendar, Info, Eye, Bookmark } from "lucide-react";
+import { Shield, Clock, Settings, Lock, Target, Shuffle, Calendar, Info, Eye, Bookmark, Save, Sparkles } from "lucide-react";
 import { ExamPreviewDialog } from "@/components/exam-preview-dialog";
 import { TemplateSelectorDialog } from "@/components/template-selector-dialog";
 import { ProgressIndicator } from "@/components/progress-indicator";
@@ -88,6 +88,21 @@ export default function CreateExamPage() {
         }
     };
 
+    const handleSaveAsDraft = async () => {
+        const form = document.getElementById("createExamForm") as HTMLFormElement;
+        if (!form) return;
+        
+        const data = new FormData(form);
+        
+        setIsSubmitting(true);
+        try {
+            await createExamAction(data);
+        } catch (error) {
+            console.error("Error creating exam:", error);
+            setIsSubmitting(false);
+        }
+    };
+
     const handleTemplateSelect = (template: any) => {
         // Apply template values to form
         const form = document.getElementById("createExamForm") as HTMLFormElement;
@@ -111,24 +126,33 @@ export default function CreateExamPage() {
     };
 
     return (
-        <div className="flex-1 space-y-6 p-4 pt-6">
-            <div className="flex items-center justify-between space-y-2">
-                <div>
-                    <h2 className="text-3xl font-bold tracking-tight">Create New Exam</h2>
-                    <p className="text-muted-foreground mt-1">Configure your exam with advanced settings and controls</p>
+        <div className="flex-1 space-y-8 p-6 pt-8 pb-16 max-w-7xl mx-auto">
+            {/* Professional Header */}
+            <div className="space-y-4">
+                <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-1.5">
+                        <h1 className="text-[28px] font-semibold tracking-tight text-foreground leading-tight">
+                            Create New Exam
+                        </h1>
+                        <p className="text-muted-foreground text-[14px] leading-relaxed max-w-2xl">
+                            Design professional assessments with advanced controls and anti-cheat features
+                        </p>
+                    </div>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        className="border-primary/20 hover:bg-primary/5 hover:border-primary/30 shrink-0"
+                        onClick={() => setShowTemplateSelector(true)}
+                    >
+                        <Bookmark className="h-4 w-4 mr-2" />
+                        Load Template
+                    </Button>
                 </div>
-                <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowTemplateSelector(true)}
-                >
-                    <Bookmark className="h-4 w-4 mr-2" />
-                    Load Template
-                </Button>
+                <div className="h-px bg-linear-to-r from-transparent via-border to-transparent" />
             </div>
 
             {/* Progress Indicator */}
-            <div className="max-w-4xl mx-auto mb-8">
+            <div className="max-w-5xl mx-auto">
                 <ProgressIndicator
                     steps={STEPS}
                     currentStep={currentStep}
@@ -141,112 +165,94 @@ export default function CreateExamPage() {
                 />
             </div>
             
-            <form id="createExamForm" onSubmit={handleFormSubmit} className="mx-auto max-w-4xl space-y-6">
+            <form id="createExamForm" onSubmit={handleFormSubmit} className="space-y-6">
                 {/* Step 0: Basic Information */}
-                {currentStep === 0 && (
-                    <>
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
+                <div style={{ display: currentStep === 0 ? 'block' : 'none' }} className="space-y-6">
+                    <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
+                        <CardHeader className="border-b bg-muted/30 pb-5">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-lg bg-primary/10 text-primary">
                                     <Settings className="h-5 w-5" />
-                                    Basic Information
-                                </CardTitle>
-                                <CardDescription>
-                                    Set the basic details for your exam
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="title">Exam Title *</Label>
-                                    <Input id="title" name="title" placeholder="e.g. Physics Midterm 2024" required />
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="description">Description</Label>
-                                    <Textarea id="description" name="description" placeholder="Brief description of the exam content and objectives" rows={3} />
+                                <div>
+                                    <CardTitle className="text-xl font-semibold tracking-tight">
+                                        Basic Information
+                                    </CardTitle>
+                                    <CardDescription className="text-[13px] mt-1 leading-relaxed">
+                                        Set the fundamental details for your exam
+                                    </CardDescription>
                                 </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="duration">Duration (minutes) *</Label>
-                                        <Input id="duration" name="duration" type="number" min="1" defaultValue="60" required />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="priceMode">Monetization</Label>
-                                        <select
-                                            id="priceMode"
-                                            name="priceMode"
-                                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                        >
-                                            <option value="FREE">Free (Subscription)</option>
-                                            <option value="PAID_BY_TEACHER">Pay Per Exam</option>
-                                        </select>
-                                    </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="space-y-5 pt-6">
+                            <div className="space-y-2.5">
+                                <Label htmlFor="title" className="text-[13px] font-medium">Exam Title *</Label>
+                                <Input id="title" name="title" placeholder="e.g. Physics Midterm 2024" required className="text-[15px]" />
+                            </div>
+                            <div className="space-y-2.5">
+                                <Label htmlFor="description" className="text-[13px] font-medium">Description</Label>
+                                <Textarea id="description" name="description" placeholder="Brief description of the exam content and objectives" rows={3} className="text-[15px] leading-relaxed" />
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                <div className="space-y-2.5">
+                                    <Label htmlFor="duration" className="text-[13px] font-medium">Duration (minutes) *</Label>
+                                    <Input id="duration" name="duration" type="number" min="1" defaultValue="60" required className="text-[15px]" />
                                 </div>
-                            </CardContent>
-                            <CardFooter className="flex justify-between">
-                                <Link href="/dashboard/exams">
-                                    <Button variant="ghost" type="button">Cancel</Button>
-                                </Link>
-                                <Button type="submit">
+                                <div className="space-y-2.5">
+                                    <Label htmlFor="priceMode" className="text-[13px] font-medium">Monetization</Label>
+                                    <select
+                                        id="priceMode"
+                                        name="priceMode"
+                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-[15px] ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        <option value="FREE">Free (Subscription)</option>
+                                        <option value="PAID_BY_TEACHER">Pay Per Exam</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </CardContent>
+                        <CardFooter className="flex justify-between items-center border-t bg-muted/20 pt-5 pb-5">
+                            <Link href="/dashboard/exams">
+                                <Button variant="ghost" type="button" className="h-10">Cancel</Button>
+                            </Link>
+                            <div className="flex items-center gap-2.5">
+                                <Button 
+                                    type="button" 
+                                    variant="outline"
+                                    onClick={handleSaveAsDraft}
+                                    disabled={isSubmitting}
+                                    className="h-10"
+                                >
+                                    <Save className="h-4 w-4 mr-2" />
+                                    Save as Draft
+                                </Button>
+                                <Button type="submit" className="h-10">
                                     Next: Configure Settings
                                 </Button>
-                            </CardFooter>
-                        </Card>
-                    </>
-                )}
+                            </div>
+                        </CardFooter>
+                    </Card>
+                </div>
 
                 {/* Step 1: All Settings */}
-                {currentStep === 1 && (
-                    <>
-                        {/* Basic Information - Read only */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Settings className="h-5 w-5" />
-                            Basic Information
-                        </CardTitle>
-                        <CardDescription>
-                            Set the basic details for your exam
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="title">Exam Title *</Label>
-                            <Input id="title" name="title" placeholder="e.g. Physics Midterm 2024" required />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="description">Description</Label>
-                            <Textarea id="description" name="description" placeholder="Brief description of the exam content and objectives" rows={3} />
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="duration">Duration (minutes) *</Label>
-                                <Input id="duration" name="duration" type="number" min="1" defaultValue="60" required />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="priceMode">Monetization</Label>
-                                <select
-                                    id="priceMode"
-                                    name="priceMode"
-                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                    <option value="FREE">Free (Subscription)</option>
-                                    <option value="PAID_BY_TEACHER">Pay Per Exam</option>
-                                </select>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
+                <div style={{ display: currentStep === 1 ? 'block' : 'none' }} className="space-y-6">
 
                 {/* Anti-Cheat Settings */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Shield className="h-5 w-5" />
-                            Anti-Cheat Settings
-                        </CardTitle>
-                        <CardDescription>
-                            Configure security and monitoring options
-                        </CardDescription>
+                <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
+                    <CardHeader className="border-b bg-muted/30">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400">
+                                <Shield className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <CardTitle className="text-xl font-semibold">
+                                    Anti-Cheat Settings
+                                </CardTitle>
+                                <CardDescription className="text-sm mt-0.5">
+                                    Configure security and monitoring options to prevent cheating
+                                </CardDescription>
+                            </div>
+                        </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="flex items-center justify-between">
@@ -281,15 +287,21 @@ export default function CreateExamPage() {
                 </Card>
 
                 {/* Grading & Results */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Target className="h-5 w-5" />
-                            Grading & Results
-                        </CardTitle>
-                        <CardDescription>
-                            Configure grading criteria and result display
-                        </CardDescription>
+                <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
+                    <CardHeader className="border-b bg-muted/30">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                                <Target className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <CardTitle className="text-xl font-semibold">
+                                    Grading & Results
+                                </CardTitle>
+                                <CardDescription className="text-sm mt-0.5">
+                                    Configure grading criteria and result display options
+                                </CardDescription>
+                            </div>
+                        </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="space-y-2">
@@ -339,15 +351,21 @@ export default function CreateExamPage() {
                 </Card>
 
                 {/* Question Settings */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Shuffle className="h-5 w-5" />
-                            Question Settings
-                        </CardTitle>
-                        <CardDescription>
-                            Randomization options for questions and answers
-                        </CardDescription>
+                <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
+                    <CardHeader className="border-b bg-muted/30">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-lg bg-green-500/10 text-green-600 dark:text-green-400">
+                                <Shuffle className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <CardTitle className="text-xl font-semibold">
+                                    Question Settings
+                                </CardTitle>
+                                <CardDescription className="text-sm mt-0.5">
+                                    Randomization options for questions and answers
+                                </CardDescription>
+                            </div>
+                        </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="flex items-center justify-between">
@@ -381,15 +399,21 @@ export default function CreateExamPage() {
                 </Card>
 
                 {/* Scheduling */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Calendar className="h-5 w-5" />
-                            Scheduling
-                        </CardTitle>
-                        <CardDescription>
-                            Control when the exam is available to students
-                        </CardDescription>
+                <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
+                    <CardHeader className="border-b bg-muted/30">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                                <Calendar className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <CardTitle className="text-xl font-semibold">
+                                    Scheduling
+                                </CardTitle>
+                                <CardDescription className="text-sm mt-0.5">
+                                    Control when the exam is available to students
+                                </CardDescription>
+                            </div>
+                        </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -436,15 +460,21 @@ export default function CreateExamPage() {
                 </Card>
 
                 {/* Access Control */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Lock className="h-5 w-5" />
-                            Access Control
-                        </CardTitle>
-                        <CardDescription>
-                            Manage who can access and how many times
-                        </CardDescription>
+                <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
+                    <CardHeader className="border-b bg-muted/30">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                                <Lock className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <CardTitle className="text-xl font-semibold">
+                                    Access Control
+                                </CardTitle>
+                                <CardDescription className="text-sm mt-0.5">
+                                    Manage who can access and how many times
+                                </CardDescription>
+                            </div>
+                        </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="flex items-center justify-between">
@@ -467,91 +497,144 @@ export default function CreateExamPage() {
                             </div>
                             <p className="text-xs text-muted-foreground">Limit how many times a student can attempt this exam</p>
                         </div>
-                        <div className="p-3 bg-purple-50 dark:bg-purple-950/20 rounded-lg border border-purple-200 dark:border-purple-800">
-                            <div className="flex gap-2">
-                                <Lock className="h-5 w-5 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
-                                <div className="text-sm text-purple-900 dark:text-purple-100">
-                                    <p className="font-medium mb-1">Access Control Tips:</p>
-                                    <ul className="list-disc list-inside space-y-1 text-purple-800 dark:text-purple-200">
-                                        <li>Use passwords for private or proctored exams</li>
-                                        <li>Allow 2-3 attempts for practice exams</li>
-                                        <li>Limit to 1 attempt for final assessments</li>
-                                    </ul>
-                                </div>
+                    </CardContent>
+                </Card>
+
+                {/* Access Control Tips */}
+                <Card className="border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/30">
+                    <CardContent className="pt-6">
+                        <div className="flex gap-3">
+                            <Lock className="h-5 w-5 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
+                            <div className="text-sm text-purple-900 dark:text-purple-100">
+                                <p className="font-medium mb-1">Access Control Tips:</p>
+                                <ul className="list-disc list-inside space-y-1 text-purple-800 dark:text-purple-200">
+                                    <li>Use passwords for private or proctored exams</li>
+                                    <li>Allow 2-3 attempts for practice exams</li>
+                                    <li>Limit to 1 attempt for final assessments</li>
+                                </ul>
                             </div>
                         </div>
                     </CardContent>
                 </Card>
 
                 {/* Navigation Buttons for Step 1 */}
-                <Card>
-                    <CardFooter className="flex justify-between pt-6">
+                <Card className="border-2">
+                    <CardFooter className="flex justify-between items-center bg-muted/30 pt-6 pb-6">
                         <Button 
                             variant="outline" 
+                            size="lg"
                             type="button"
                             onClick={() => setCurrentStep(0)}
+                            className="border-2 h-11"
                         >
                             Back to Basic Info
                         </Button>
-                        <Button type="submit">
-                            Next: Review
-                        </Button>
+                        <div className="flex items-center gap-2.5">
+                            <Button 
+                                type="button" 
+                                variant="outline"
+                                size="lg"
+                                onClick={handleSaveAsDraft}
+                                disabled={isSubmitting}
+                                className="h-11"
+                            >
+                                <Save className="h-4 w-4 mr-2" />
+                                Save as Draft
+                            </Button>
+                            <Button type="submit" size="lg" className="h-11">
+                                Next: Review
+                            </Button>
+                        </div>
                     </CardFooter>
                 </Card>
-                    </>
-                )}
+                </div>
 
                 {/* Step 2: Review */}
-                {currentStep === 2 && (
-                    <>
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Review Your Exam</CardTitle>
-                                <CardDescription>Check all settings before creating the exam</CardDescription>
+                <div style={{ display: currentStep === 2 ? 'block' : 'none' }} className="space-y-6">
+                        <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
+                            <CardHeader className="border-b bg-muted/30">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 rounded-lg bg-green-500/10 text-green-600 dark:text-green-400">
+                                        <Eye className="h-5 w-5" />
+                                    </div>
+                                    <div>
+                                        <CardTitle className="text-xl font-semibold">
+                                            Review Your Exam
+                                        </CardTitle>
+                                        <CardDescription className="text-sm mt-0.5">
+                                            Check all settings before creating the exam
+                                        </CardDescription>
+                                    </div>
+                                </div>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                                <div className="rounded-lg border p-4 space-y-3">
-                                    <h4 className="font-semibold text-lg">Exam Details</h4>
-                                    <div className="grid gap-2 text-sm">
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Title:</span>
-                                            <span className="font-medium">Review after preview</span>
+                                <div className="rounded-xl border-2 p-6 space-y-4 bg-linear-to-br from-muted/30 to-muted/50">
+                                    <h4 className="font-bold text-xl flex items-center gap-2">
+                                        <Info className="h-5 w-5 text-primary" />
+                                        Exam Summary
+                                    </h4>
+                                    <div className="grid gap-3 text-sm">
+                                        <div className="flex justify-between items-center p-3 rounded-lg bg-background/80">
+                                            <span className="text-muted-foreground font-medium">Title:</span>
+                                            <span className="font-semibold">Review after preview</span>
                                         </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Duration:</span>
-                                            <span className="font-medium">Set in form</span>
+                                        <div className="flex justify-between items-center p-3 rounded-lg bg-background/80">
+                                            <span className="text-muted-foreground font-medium">Duration:</span>
+                                            <span className="font-semibold">Set in form</span>
                                         </div>
                                     </div>
                                 </div>
-                                <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200">
-                                    <p className="text-sm text-blue-900 dark:text-blue-100">
-                                        <Info className="inline h-4 w-4 mr-2" />
-                                        Click "Preview & Create" to see a detailed preview of your exam configuration before final submission.
-                                    </p>
+
+                                <div className="relative overflow-hidden p-6 bg-linear-to-br from-blue-500/10 via-purple-500/10 to-pink-500/10 rounded-xl border-2 border-blue-200 dark:border-blue-800">
+                                    <div className="absolute top-0 right-0 w-32 h-32 bg-linear-to-br from-blue-500/20 to-purple-500/20 rounded-full blur-3xl" />
+                                    <div className="relative flex gap-3">
+                                        <div className="p-2 rounded-lg bg-linear-to-br from-blue-500 to-purple-500 shadow-lg h-fit">
+                                            <Sparkles className="h-5 w-5 text-white" />
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-base mb-2 text-foreground">Ready to Preview</p>
+                                            <p className="text-sm text-muted-foreground leading-relaxed">
+                                                Click "Preview & Create" to see a detailed preview of your exam configuration before final submission. You'll be able to review all settings, questions, and options.
+                                            </p>
+                                        </div>
+                                    </div>
                                 </div>
                             </CardContent>
                         </Card>
 
                         {/* Action Buttons */}
-                        <Card>
-                            <CardFooter className="flex justify-between pt-6">
+                        <Card className="border-2">
+                            <CardFooter className="flex justify-between items-center bg-muted/30 pt-6 pb-6">
                                 <Button 
-                                    variant="outline" 
+                                    variant="outline"
+                                    size="lg"
                                     type="button"
                                     onClick={() => setCurrentStep(1)}
+                                    className="border-2 h-11"
                                 >
                                     Back to Settings
                                 </Button>
-                                <Button type="submit" size="lg">
-                                    <Eye className="mr-2 h-4 w-4" />
-                                    Preview & Create
-                                </Button>
+                                <div className="flex items-center gap-2.5">
+                                    <Button 
+                                        type="button" 
+                                        variant="outline"
+                                        size="lg"
+                                        onClick={handleSaveAsDraft}
+                                        disabled={isSubmitting}
+                                        className="border-2 h-11"
+                                    >
+                                        <Save className="h-4 w-4 mr-2" />
+                                        Save as Draft
+                                    </Button>
+                                    <Button type="submit" size="lg" className="h-11 bg-linear-to-r from-emerald-500 via-green-500 to-teal-500 hover:from-emerald-600 hover:via-green-600 hover:to-teal-600 shadow-lg hover:shadow-xl transition-all">
+                                        <Eye className="mr-2 h-5 w-5" />
+                                        Preview & Create
+                                    </Button>
+                                </div>
                             </CardFooter>
                         </Card>
-                    </>
-                )}
+                </div>
             </form>
-
             {/* Preview Dialog */}
             {formData && (
                 <ExamPreviewDialog

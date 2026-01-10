@@ -121,7 +121,7 @@ export default async function Home() {
                 
                 {/* Main Headline */}
                 <div className="space-y-3 sm:space-y-4 max-w-4xl px-2">
-                  <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl animate-fade-in-up leading-tight">
+                  <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl animate-fade-in-up leading-tight">
                     Create & Manage Exams
                     <span className="block mt-1 sm:mt-2">
                       <GradientText>Like Never Before</GradientText>
@@ -202,7 +202,7 @@ export default async function Home() {
             <ScrollReveal>
               <div className="flex flex-col items-center justify-center space-y-3 sm:space-y-4 text-center mb-10 sm:mb-12 md:mb-16">
                 <Badge variant="outline" className="px-3 py-1 text-xs sm:text-sm">Features</Badge>
-                <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight max-w-3xl px-2">
+                <h2 className="font-display text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight max-w-3xl px-2">
                   Everything You Need to Run <span className="text-primary">Secure Online Exams</span>
                 </h2>
                 <p className="max-w-[90%] sm:max-w-175 text-sm sm:text-base md:text-lg text-muted-foreground px-2">
@@ -318,7 +318,7 @@ export default async function Home() {
             <ScrollReveal>
               <div className="flex flex-col items-center justify-center space-y-3 sm:space-y-4 text-center mb-10 sm:mb-12 md:mb-16">
                 <Badge variant="outline" className="px-3 py-1 text-xs sm:text-sm">How It Works</Badge>
-                <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight max-w-3xl px-2">
+                <h2 className="font-display text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight max-w-3xl px-2">
                   Get Started in <span className="text-primary">3 Simple Steps</span>
                 </h2>
                 <p className="max-w-[90%] sm:max-w-175 text-sm sm:text-base md:text-lg text-muted-foreground px-2">
@@ -374,7 +374,7 @@ export default async function Home() {
             <ScrollReveal>
               <div className="flex flex-col items-center justify-center space-y-3 sm:space-y-4 text-center mb-10 sm:mb-12 md:mb-16">
                 <Badge variant="outline" className="px-3 py-1 text-xs sm:text-sm">Pricing</Badge>
-                <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight px-2">
+                <h2 className="font-display text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight px-2">
                   Simple, Transparent Pricing
                 </h2>
                 <p className="max-w-[90%] sm:max-w-175 text-sm sm:text-base md:text-lg text-muted-foreground px-2">
@@ -521,7 +521,7 @@ export default async function Home() {
                   <Sparkles className="mr-1.5 sm:mr-2 h-3 w-3 sm:h-3.5 sm:w-3.5" />
                   Join 10,000+ Educators
                 </Badge>
-                <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold px-2">
+                <h2 className="font-display text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold px-2">
                   Ready to Transform Your Exams?
                 </h2>
                 <p className="text-sm sm:text-base md:text-lg lg:text-xl text-white/90 max-w-2xl mx-auto px-4">

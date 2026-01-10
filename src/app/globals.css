@@ -92,6 +92,34 @@
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
+    font-family: var(--font-satoshi), system-ui, sans-serif;
+    font-weight: 400;
+    line-height: 1.6;
+    letter-spacing: -0.011em;
+  }
+
+  /* Typography defaults - Satoshi optimized */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-satoshi), system-ui, sans-serif;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+  }
+
+  h1 { 
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+  }
+
+  /* Marketing headings use Clash Display */
+  .font-display {
+    font-family: var(--font-clash-display), system-ui, sans-serif;
+    line-height: 1.1;
+    letter-spacing: -0.04em;
+  }
+
+  /* Improved readability for exam questions */
+  p, label, span {
+    letter-spacing: -0.011em;
   }
 
   /* Global cursor pointer for interactive elements */

@@ -1,17 +1,50 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+// Satoshi: Primary font for ALL UI - dashboard, exam questions, forms, buttons, tables
+// Professional, highly readable, distraction-free
+const satoshi = localFont({
+  src: [
+    {
+      path: "../../public/fonts/Satoshi-Regular.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../../public/fonts/Satoshi-Medium.woff2",
+      weight: "500",
+      style: "normal",
+    },
+    {
+      path: "../../public/fonts/Satoshi-Bold.woff2",
+      weight: "600",
+      style: "normal",
+    },
+  ],
+  variable: "--font-satoshi",
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+// Clash Display: ONLY for marketing page headings (hero, pricing, landing)
+// NEVER used in dashboard or exam UI
+const clashDisplay = localFont({
+  src: [
+    {
+      path: "../../public/fonts/ClashDisplay-Semibold.woff2",
+      weight: "600",
+      style: "normal",
+    },
+    {
+      path: "../../public/fonts/ClashDisplay-Bold.woff2",
+      weight: "700",
+      style: "normal",
+    },
+  ],
+  variable: "--font-clash-display",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -27,7 +60,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${satoshi.variable} ${clashDisplay.variable} antialiased`}
         suppressHydrationWarning
       >
         <ThemeProvider

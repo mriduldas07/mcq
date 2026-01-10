@@ -590,7 +590,7 @@ export function ExamSession({
                         )}
                     </div>
                     <div className={cn(
-                        "flex items-center gap-2 font-mono text-xl font-bold px-4 py-2 rounded-md",
+                        "flex items-center gap-2 text-xl font-semibold px-4 py-2 rounded-md",
                         timeLeft < 60 ? "bg-red-100 text-red-600" : "bg-primary/10 text-primary"
                     )}>
                         <Clock className="h-5 w-5" />
@@ -634,17 +634,17 @@ export function ExamSession({
             <main className="flex-1 container mx-auto p-4 md:p-8 max-w-3xl">
                 {questions.length > 0 ? (
                     <Card className="min-h-100 flex flex-col">
-                        <CardHeader>
-                            <div className="flex justify-between items-center mb-4">
-                                <span className="text-sm font-medium text-muted-foreground">
+                        <CardHeader className="pb-5">
+                            <div className="flex justify-between items-center mb-5">
+                                <span className="text-sm font-medium text-muted-foreground tracking-tight">
                                     Question {currentQuestionIndex + 1} of {questions.length}
                                 </span>
                             </div>
-                            <CardTitle className="text-xl md:text-2xl leading-relaxed">
+                            <CardTitle className="text-[17px] md:text-[19px] font-medium leading-[1.65] tracking-[-0.01em]">
                                 {currentQuestion.text}
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="flex-1">
+                        <CardContent className="flex-1 pt-2">
                             <RadioGroup
                                 value={answers[currentQuestion.id] || ""}
                                 onValueChange={(val: string) => handleOptionSelect(currentQuestion.id, val)}
@@ -654,20 +654,20 @@ export function ExamSession({
                                     <div
                                         key={opt.id}
                                         className={cn(
-                                            "flex items-center space-x-2 border rounded-lg p-4 transition-all cursor-pointer hover:bg-accent",
+                                            "flex items-center space-x-3 border rounded-lg p-4 transition-all cursor-pointer hover:bg-accent min-h-[52px]",
                                             answers[currentQuestion.id] === opt.id ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-input"
                                         )}
                                         onClick={() => handleOptionSelect(currentQuestion.id, opt.id)}
                                     >
-                                        <RadioGroupItem value={opt.id} id={opt.id} />
-                                        <Label htmlFor={opt.id} className="flex-1 cursor-pointer font-normal text-base">
+                                        <RadioGroupItem value={opt.id} id={opt.id} className="shrink-0" />
+                                        <Label htmlFor={opt.id} className="flex-1 cursor-pointer font-normal text-[15px] md:text-base leading-[1.6] tracking-[-0.01em]">
                                             {opt.text}
                                         </Label>
                                     </div>
                                 ))}
                             </RadioGroup>
                         </CardContent>
-                        <CardFooter className="justify-between border-t p-6 bg-muted/10">
+                        <CardFooter className="justify-between border-t p-6 bg-muted/10 mt-4">
                             <Button
                                 variant="outline"
                                 onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))}
