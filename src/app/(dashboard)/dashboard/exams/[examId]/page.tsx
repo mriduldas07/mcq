@@ -16,6 +16,8 @@ import { EditExamForm } from "@/components/edit-exam-form";
 import { BulkImportButton } from "@/components/bulk-import-button";
 import { SaveToBankButton } from "@/components/save-to-bank-button";
 import { ImportFromBankButton } from "@/components/import-from-bank-button";
+import { ExamQuestionsList } from "@/components/exam-questions-list";
+import { ExamBlueprint } from "@/components/exam-blueprint";
 import { verifySession } from "@/lib/session";
 import { Prisma } from "@prisma/client";
 import Link from "next/link";
@@ -157,80 +159,13 @@ export default async function ExamEditorPage({
 
             <div className="grid gap-4 md:grid-cols-[1fr_350px] overflow-hidden">
                 <div className="space-y-4 min-w-0">
-                    {/* Question List */}
-                    {exam.questions.length === 0 ? (
-                        <Card className="border-dashed">
-                            <CardContent className="flex h-32 items-center justify-center text-muted-foreground text-sm">
-                                No questions yet. Add one below.
-                            </CardContent>
-                        </Card>
-                    ) : (
-                        <div className="space-y-4 min-w-0">
-                            {exam.questions.map((q, i: number) => {
-                                let options: Array<{ id: string; text: string }> = [];
-                                try {
-                                    options = typeof q.options === 'string' 
-                                        ? JSON.parse(q.options) 
-                                        : q.options as Array<{ id: string; text: string }>;
-                                } catch (e) {
-                                    console.error('Failed to parse options', e);
-                                }
-                                
-                                return (
-                                    <Card key={q.id} className="overflow-visible">
-                                        <CardHeader className="p-3 sm:p-4">
-                                            <div className="flex justify-between items-start gap-2 min-w-0">
-                                                <div className="flex flex-col gap-2 flex-1 min-w-0">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="font-semibold text-sm shrink-0">Q{i + 1}</span>
-                                                        {bankStatusMap.get(q.text)?.inBank && bankStatusMap.get(q.text)?.folderName && (
-                                                            <Badge variant="outline" className="text-xs flex items-center gap-1">
-                                                                <span>📁</span>
-                                                                <span>{bankStatusMap.get(q.text)?.folderName}</span>
-                                                            </Badge>
-                                                        )}
-                                                        {bankStatusMap.get(q.text)?.inBank && !bankStatusMap.get(q.text)?.folderName && (
-                                                            <Badge variant="outline" className="text-xs text-muted-foreground">
-                                                                Saved (No folder)
-                                                            </Badge>
-                                                        )}
-                                                    </div>
-                                                    <p className="text-sm sm:text-base wrap-break-word overflow-wrap-anywhere">{q.text}</p>
-                                                </div>
-                                                <div className="flex gap-2 shrink-0">
-                                                    <SaveToBankButton 
-                                                        examId={examId} 
-                                                        questionId={q.id}
-                                                        initialStatus={bankStatusMap.get(q.text) || { inBank: false }}
-                                                        questionBankId={bankStatusMap.get(q.text)?.questionBankId}
-                                                    />
-                                                    {exam.status !== 'PUBLISHED' && (
-                                                        <DeleteQuestionButton questionId={q.id} examId={examId} />
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </CardHeader>
-                                        <CardContent className="pt-0 pb-3 sm:pb-4 px-3 sm:px-4">
-                                            <div className="space-y-1 min-w-0">
-                                                {options.map((opt) => (
-                                                    <div 
-                                                        key={opt.id} 
-                                                        className={`text-xs sm:text-sm px-2 sm:px-3 py-1.5 rounded wrap-break-word overflow-wrap-anywhere ${
-                                                            opt.id === q.correctOption 
-                                                                ? 'bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 font-medium' 
-                                                                : 'text-muted-foreground'
-                                                        }`}
-                                                    >
-                                                        {opt.text} {opt.id === q.correctOption && '✓'}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                );
-                            })}
-                        </div>
-                    )}
+                    {/* Question List with Drag and Drop */}
+                    <ExamQuestionsList
+                        examId={examId}
+                        questions={exam.questions}
+                        bankStatusMap={bankStatusMap}
+                        isPublished={exam.status === 'PUBLISHED'}
+                    />
 
                     {/* Add Question Form */}
                     {exam.status !== 'PUBLISHED' && (
@@ -270,6 +205,13 @@ export default async function ExamEditorPage({
 
                 {/* Sidebar settings */}
                 <div className="space-y-4 min-w-0">
+                    {/* Exam Blueprint */}
+                    <ExamBlueprint
+                        questions={exam.questions}
+                        duration={exam.duration}
+                        passPercentage={exam.passPercentage}
+                    />
+
                     {/* TASK 5: Account Status Card */}
                     <Card className={isPro ? "border-primary/20 bg-primary/5" : ""}>
                         <CardHeader>

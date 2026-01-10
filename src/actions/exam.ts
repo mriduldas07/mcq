@@ -603,3 +603,71 @@ export async function archiveExamAction(examId: string) {
         return { error: "Failed to archive exam" };
     }
 }
+
+/**
+ * Reorder questions in an exam by updating their order in the database
+ */
+export async function reorderQuestionsAction(examId: string, questionIds: string[]) {
+    "use server";
+    
+    const session = await verifySession();
+    if (!session) {
+        throw new Error("Unauthorized");
+    }
+
+    // Verify exam ownership
+    const exam = await prisma.exam.findUnique({
+        where: { id: examId },
+        select: { 
+            teacherId: true,
+            status: true 
+        }
+    });
+
+    if (!exam || exam.teacherId !== session.userId) {
+        throw new Error("Unauthorized or exam not found");
+    }
+
+    if (exam.status === "PUBLISHED") {
+        throw new Error("Cannot reorder questions in a published exam");
+    }
+
+    // Delete all questions and re-create them in the new order
+    // This is a simple approach - in production you might want to add an 'order' field
+    const questions = await prisma.question.findMany({
+        where: { 
+            examId,
+            id: { in: questionIds }
+        }
+    });
+
+    // Create a map of id to question data
+    const questionMap = new Map(questions.map(q => [q.id, q]));
+
+    // Delete existing questions
+    await prisma.question.deleteMany({
+        where: { examId }
+    });
+
+    // Re-create questions in new order
+    for (const questionId of questionIds) {
+        const questionData = questionMap.get(questionId);
+        if (questionData) {
+            await prisma.question.create({
+                data: {
+                    examId,
+                    text: questionData.text,
+                    options: questionData.options as any,
+                    correctOption: questionData.correctOption,
+                    marks: questionData.marks,
+                    negativeMarks: questionData.negativeMarks,
+                    timeLimit: questionData.timeLimit,
+                    explanation: questionData.explanation,
+                }
+            });
+        }
+    }
+
+    revalidatePath(`/dashboard/exams/${examId}`);
+    return { success: true };
+}
