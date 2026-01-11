@@ -93,10 +93,10 @@ export default async function ExamEditorPage({
     const isPro = user?.planType === "PRO";
 
     return (
-        <div className="flex-1 space-y-4 sm:space-y-6 overflow-hidden w-full max-w-full">
+        <div className="flex-1 space-y-4 sm:space-y-6 overflow-hidden w-full max-w-full px-3 sm:px-0">
             {/* Header Section */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 min-w-0">
-                <h2 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight wrap-break-word pr-2">{exam.title}</h2>
+                <h2 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold tracking-tight break-words pr-2">{exam.title}</h2>
                 <div className="flex flex-wrap items-center gap-2">
                     {exam.status === 'PUBLISHED' && <CopyLinkButton examId={examId} />}
                     <span className="text-xs sm:text-sm text-muted-foreground uppercase font-semibold whitespace-nowrap">{exam.status}</span>

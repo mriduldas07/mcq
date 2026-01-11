@@ -102,10 +102,10 @@ export default async function ExamResultsPage({
     });
 
     return (
-        <div className="flex-1 space-y-4 sm:space-y-6">
+        <div className="flex-1 space-y-4 sm:space-y-6 px-3 sm:px-0">
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
                 <div className="min-w-0 flex-1">
-                    <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight truncate">
+                    <h2 className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold tracking-tight break-words">
                         Results: {exam.title}
                     </h2>
                     <p className="text-xs sm:text-sm text-muted-foreground mt-1">

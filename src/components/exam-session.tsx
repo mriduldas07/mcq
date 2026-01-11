@@ -496,25 +496,25 @@ export function ExamSession({
     if (examState === ExamState.WAITING) {
         return (
             <div className="flex flex-col min-h-screen bg-muted/20">
-                <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-                    <Card className="max-w-lg w-full">
-                        <CardHeader>
-                            <CardTitle className="text-center text-2xl">
+                <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-3 sm:p-4">
+                    <Card className="max-w-lg w-full mx-3">
+                        <CardHeader className="px-4 sm:px-6">
+                            <CardTitle className="text-center text-lg sm:text-xl md:text-2xl">
                                 {antiCheatEnabled ? "🔒 Exam Ready" : "📝 Exam Ready"}
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="text-center space-y-2">
-                                <p className="text-lg font-medium">{studentName}</p>
-                                <p className="text-sm text-muted-foreground">Roll: {rollNumber}</p>
-                                <p className="text-sm text-muted-foreground">Duration: {durationMinutes} minutes</p>
-                                <p className="text-sm text-muted-foreground">Questions: {questions.length}</p>
+                        <CardContent className="space-y-3 sm:space-y-4 px-4 sm:px-6">
+                            <div className="text-center space-y-1.5 sm:space-y-2">
+                                <p className="text-base sm:text-lg font-medium">{studentName}</p>
+                                <p className="text-xs sm:text-sm text-muted-foreground">Roll: {rollNumber}</p>
+                                <p className="text-xs sm:text-sm text-muted-foreground">Duration: {durationMinutes} minutes</p>
+                                <p className="text-xs sm:text-sm text-muted-foreground">Questions: {questions.length}</p>
                             </div>
                             
                             {antiCheatEnabled ? (
-                                <div className="rounded-md bg-yellow-50 p-4 text-sm text-yellow-800 border border-yellow-200">
+                                <div className="rounded-md bg-yellow-50 p-3 sm:p-4 text-xs sm:text-sm text-yellow-800 border border-yellow-200">
                                     <strong>⚠️ Important Rules:</strong>
-                                    <ul className="list-disc pl-4 mt-2 space-y-1">
+                                    <ul className="list-disc pl-4 mt-1.5 sm:mt-2 space-y-0.5 sm:space-y-1">
                                         <li>Click below to enter fullscreen and START the exam timer</li>
                                         <li>Timer will NOT pause once started</li>
                                         <li>Exiting fullscreen or switching tabs = violation</li>
@@ -523,15 +523,15 @@ export function ExamSession({
                                     </ul>
                                 </div>
                             ) : (
-                                <div className="rounded-md bg-blue-50 p-4 text-sm text-blue-800 border border-blue-200">
+                                <div className="rounded-md bg-blue-50 p-3 sm:p-4 text-xs sm:text-sm text-blue-800 border border-blue-200">
                                     <p>Click below to start your exam. Your timer will begin immediately.</p>
                                 </div>
                             )}
                         </CardContent>
-                        <CardFooter>
+                        <CardFooter className="px-4 sm:px-6">
                             <Button 
                                 onClick={handleEnterFullscreen}
-                                className="w-full text-lg h-12"
+                                className="w-full text-base sm:text-lg h-11 sm:h-12"
                                 size="lg"
                             >
                                 {antiCheatEnabled ? "Enter Fullscreen & Start Exam" : "Start Exam"}
@@ -549,10 +549,10 @@ export function ExamSession({
     return (
         <div className="flex flex-col min-h-screen bg-muted/20">
             {/* Header */}
-            <header className="sticky top-0 z-10 bg-background border-b shadow-sm p-4">
-                <div className="container mx-auto flex items-center justify-between">
-                    <div>
-                        <h1 className="font-semibold">{studentName}</h1>
+            <header className="sticky top-0 z-10 bg-background border-b shadow-sm p-3 sm:p-4">
+                <div className="container mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4">
+                    <div className="min-w-0 flex-1">
+                        <h1 className="font-semibold text-sm sm:text-base truncate">{studentName}</h1>
                         <p className="text-xs text-muted-foreground">Roll: {rollNumber}</p>
                         {!isOnline && (
                             <p className="text-xs text-orange-600 font-medium">⚠️ Offline - Changes saved locally</p>
@@ -562,7 +562,7 @@ export function ExamSession({
                         )}
                     </div>
                     <div className={cn(
-                        "flex items-center gap-2 text-xl font-semibold px-4 py-2 rounded-md",
+                        "flex items-center gap-1.5 sm:gap-2 text-base sm:text-lg md:text-xl font-semibold px-3 sm:px-4 py-1.5 sm:py-2 rounded-md",
                         timeLeft < 60 ? "bg-red-100 text-red-600" : "bg-primary/10 text-primary"
                     )}>
                         <Clock className="h-5 w-5" />
@@ -573,12 +573,13 @@ export function ExamSession({
                         size="sm"
                         onClick={() => handleSubmit(false)}
                         disabled={isSubmitting || examState === ExamState.ENDED || (!isOnline && pendingSaves.length > 0)}
+                        className="text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3"
                     >
-                        {isSubmitting ? "Submitting..." : "Finish Exam"}
+                        {isSubmitting ? "Submitting..." : "Finish"}
                     </Button>
                 </div>
                 {antiCheatEnabled && violations > 0 && (
-                    <div className={`text-sm px-4 py-2 text-center animate-pulse ${
+                    <div className={`text-xs sm:text-sm px-3 sm:px-4 py-1.5 sm:py-2 text-center animate-pulse ${
                         violations >= maxViolations ? 'bg-red-100 text-red-700' :
                         violations >= maxViolations - 1 ? 'bg-orange-100 text-orange-700' :
                         'bg-yellow-100 text-yellow-700'
@@ -598,31 +599,31 @@ export function ExamSession({
             </header>
 
             {/* Main Content */}
-            <main className="flex-1 container mx-auto p-4 md:p-8 max-w-3xl">
+            <main className="flex-1 container mx-auto p-3 sm:p-4 md:p-6 lg:p-8 max-w-3xl">
                 {questions.length > 0 ? (
                     <Card className="min-h-100 flex flex-col">
-                        <CardHeader className="pb-5">
-                            <div className="flex justify-between items-center mb-5">
-                                <span className="text-sm font-medium text-muted-foreground">
+                        <CardHeader className="pb-4 sm:pb-5 px-4 sm:px-6">
+                            <div className="flex justify-between items-center mb-3 sm:mb-5">
+                                <span className="text-xs sm:text-sm font-medium text-muted-foreground">
                                     Question {currentQuestionIndex + 1} of {questions.length}
                                 </span>
                             </div>
-                            <CardTitle className="text-[17px] md:text-[19px] font-medium leading-[1.65]">
+                            <CardTitle className="text-sm sm:text-base md:text-[17px] lg:text-[19px] font-medium leading-[1.65]">
                                 {currentQuestion.text}
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="flex-1 pt-2">
+                        <CardContent className="flex-1 pt-2 px-4 sm:px-6">
                             <RadioGroup
                                 value={answers[currentQuestion.id] || ""}
                                 onValueChange={(val: string) => handleOptionSelect(currentQuestion.id, val)}
                                 disabled={examState === ExamState.ENDED}
-                                className="space-y-3"
+                                className="space-y-2 sm:space-y-3"
                             >
                                 {currentQuestion.options.map((opt) => (
                                     <div
                                         key={opt.id}
                                         className={cn(
-                                            "flex items-center space-x-3 border rounded-lg p-4 transition-all min-h-[52px]",
+                                            "flex items-center space-x-2 sm:space-x-3 border rounded-lg p-3 sm:p-4 transition-all min-h-[48px] sm:min-h-[52px]",
                                             examState === ExamState.RUNNING && "cursor-pointer hover:bg-accent",
                                             examState === ExamState.ENDED && "opacity-60",
                                             answers[currentQuestion.id] === opt.id ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-input"
@@ -630,18 +631,19 @@ export function ExamSession({
                                         onClick={() => handleOptionSelect(currentQuestion.id, opt.id)}
                                     >
                                         <RadioGroupItem value={opt.id} id={opt.id} className="shrink-0" />
-                                        <Label htmlFor={opt.id} className="flex-1 cursor-pointer font-normal text-[15px] md:text-base leading-[1.6]">
+                                        <Label htmlFor={opt.id} className="flex-1 cursor-pointer font-normal text-sm sm:text-[15px] md:text-base leading-[1.6]">
                                             {opt.text}
                                         </Label>
                                     </div>
                                 ))}
                             </RadioGroup>
                         </CardContent>
-                        <CardFooter className="justify-between border-t p-6 bg-muted/10 mt-4">
+                        <CardFooter className="justify-between border-t p-4 sm:p-6 bg-muted/10 mt-4">
                             <Button
                                 variant="outline"
                                 onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))}
                                 disabled={currentQuestionIndex === 0 || examState === ExamState.ENDED}
+                                className="text-sm sm:text-base h-9 sm:h-10"
                             >
                                 Previous
                             </Button>
@@ -650,6 +652,7 @@ export function ExamSession({
                                 <Button 
                                     onClick={() => handleSubmit(false)} 
                                     disabled={isSubmitting || examState === ExamState.ENDED}
+                                    className="text-sm sm:text-base h-9 sm:h-10"
                                 >
                                     {isSubmitting ? "Submitting..." : "Submit Exam"}
                                 </Button>
@@ -657,6 +660,7 @@ export function ExamSession({
                                 <Button 
                                     onClick={() => setCurrentQuestionIndex(prev => Math.min(questions.length - 1, prev + 1))}
                                     disabled={examState === ExamState.ENDED}
+                                    className="text-sm sm:text-base h-9 sm:h-10"
                                 >
                                     Next Question
                                 </Button>

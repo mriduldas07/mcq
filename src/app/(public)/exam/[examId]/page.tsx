@@ -94,14 +94,14 @@ export default async function ExamLandingPage({
     const canAccess = isPublished && !isBeforeStart && (!isAfterEnd || exam.allowLateSubmission);
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-muted/30 to-muted/10 p-4">
+        <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-muted/30 to-muted/10 p-3 sm:p-4 md:p-6">
             <Card className="w-full max-w-md shadow-lg">
-                <CardHeader className="text-center space-y-3 pb-4">
-                    <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
-                        <span className="text-3xl">📝</span>
+                <CardHeader className="text-center space-y-3 pb-4 px-4 sm:px-6">
+                    <div className="mx-auto w-14 h-14 sm:w-16 sm:h-16 bg-primary/10 rounded-full flex items-center justify-center">
+                        <span className="text-2xl sm:text-3xl">📝</span>
                     </div>
-                    <CardTitle className="text-2xl">{exam.title}</CardTitle>
-                    <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
+                    <CardTitle className="text-xl sm:text-2xl">{exam.title}</CardTitle>
+                    <div className="flex items-center justify-center gap-3 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
                         <div className="flex items-center gap-1">
                             <span>⏱️</span>
                             <span>{exam.duration} mins</span>
@@ -115,7 +115,7 @@ export default async function ExamLandingPage({
                         <p className="text-xs text-muted-foreground">By {exam.teacher.name}</p>
                     )}
                 </CardHeader>
-                <CardContent>
+                <CardContent className="px-4 sm:px-6 space-y-4">
                     {/* Show status warnings */}
                     {isDraft && (
                         <div className="rounded-md bg-yellow-50 p-4 text-sm text-yellow-800 border border-yellow-200 mb-6">
@@ -147,7 +147,7 @@ export default async function ExamLandingPage({
 
                     {canAccess && (
                         <>
-                            <div className="rounded-md bg-blue-50 p-4 text-sm text-blue-800 border border-blue-200 mb-6">
+                            <div className="rounded-md bg-blue-50 p-3 sm:p-4 text-xs sm:text-sm text-blue-800 border border-blue-200 mb-4 sm:mb-6">
                                 <strong>📋 Instructions:</strong>
                                 <ul className="list-disc pl-4 mt-2 space-y-1">
                                     <li>You must enter <strong>fullscreen mode</strong> to start the exam.</li>
@@ -165,44 +165,44 @@ export default async function ExamLandingPage({
 
                             <form action={startExamAction} className="mt-4">
                                 <input type="hidden" name="examId" value={examId} />
-                                <div className="space-y-5">
+                                <div className="space-y-4 sm:space-y-5">
                                     <div className="space-y-2">
-                                        <Label htmlFor="name" className="text-base">Full Name</Label>
+                                        <Label htmlFor="name" className="text-sm sm:text-base">Full Name</Label>
                                         <Input 
                                             id="name"
                                             name="name" 
                                             required 
                                             placeholder="Enter your name"
                                             minLength={2}
-                                            className="h-12 text-base"
+                                            className="h-11 sm:h-12 text-sm sm:text-base"
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="roll" className="text-base">Roll Number / ID</Label>
+                                        <Label htmlFor="roll" className="text-sm sm:text-base">Roll Number / ID</Label>
                                         <Input 
                                             id="roll"
                                             name="roll" 
                                             required 
                                             placeholder="e.g. 12345"
                                             minLength={1}
-                                            className="h-12 text-base"
+                                            className="h-11 sm:h-12 text-sm sm:text-base"
                                         />
                                     </div>
                                     {exam.requirePassword && (
                                         <div className="space-y-2">
-                                            <Label htmlFor="password" className="text-base">Exam Password 🔒</Label>
+                                            <Label htmlFor="password" className="text-sm sm:text-base">Exam Password 🔒</Label>
                                             <Input 
                                                 id="password"
                                                 name="password" 
                                                 type="password"
                                                 required 
                                                 placeholder="Enter exam password"
-                                                className="h-12 text-base"
+                                                className="h-11 sm:h-12 text-sm sm:text-base"
                                             />
                                             <p className="text-xs text-muted-foreground">This exam requires a password to access</p>
                                         </div>
                                     )}
-                                    <Button type="submit" className="w-full text-lg h-14 font-semibold shadow-lg hover:shadow-xl transition-all">
+                                    <Button type="submit" className="w-full text-base sm:text-lg h-12 sm:h-14 font-semibold shadow-lg hover:shadow-xl transition-all">
                                         🚀 Start Exam
                                     </Button>
                                 </div>

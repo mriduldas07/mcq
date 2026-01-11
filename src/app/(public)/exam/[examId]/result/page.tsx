@@ -93,10 +93,10 @@ export default async function ResultPage({
     const isPassing = percentage >= passPercentage;
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-muted/30 to-muted/10 p-4">
+        <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-muted/30 to-muted/10 p-3 sm:p-4 md:p-6">
             <Card className="w-full max-w-2xl shadow-lg">
-                <CardHeader className="text-center">
-                    <div className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full mb-4 ${
+                <CardHeader className="text-center px-4 sm:px-6">
+                    <div className={`mx-auto flex h-16 w-16 sm:h-20 sm:w-20 items-center justify-center rounded-full mb-3 sm:mb-4 ${
                         isPassing ? 'bg-green-100' : 'bg-red-100'
                     }`}>
                         {isPassing ? (
@@ -105,7 +105,7 @@ export default async function ResultPage({
                             <XCircle className="h-10 w-10 text-red-600" />
                         )}
                     </div>
-                    <CardTitle className="text-2xl">
+                    <CardTitle className="text-xl sm:text-2xl">
                         {isPassing ? '🎉 Congratulations! You Passed!' : '😔 You Did Not Pass'}
                     </CardTitle>
                     <CardDescription>
@@ -115,39 +115,39 @@ export default async function ResultPage({
                         }
                     </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
+                <CardContent className="space-y-4 sm:space-y-6 px-4 sm:px-6">
                     {/* Main Score Display */}
-                    <div className="bg-gradient-to-br from-primary/10 to-primary/5 p-6 rounded-lg border border-primary/20">
-                        <p className="text-sm font-medium text-muted-foreground text-center">Your Score</p>
-                        <p className="text-5xl font-bold mt-2 text-center">
+                    <div className="bg-gradient-to-br from-primary/10 to-primary/5 p-4 sm:p-6 rounded-lg border border-primary/20">
+                        <p className="text-xs sm:text-sm font-medium text-muted-foreground text-center">Your Score</p>
+                        <p className="text-3xl sm:text-4xl md:text-5xl font-bold mt-2 text-center">
                             {attempt.score} / {totalMarks}
                         </p>
-                        <p className="text-2xl font-semibold text-primary mt-2 text-center">
+                        <p className="text-xl sm:text-2xl font-semibold text-primary mt-2 text-center">
                             {percentage}%
                         </p>
                     </div>
 
                     {/* Statistics Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div className="text-center p-4 bg-green-50 rounded-lg border border-green-200">
-                            <div className="flex items-center justify-center mb-2">
-                                <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    <div className="grid grid-cols-3 gap-2 sm:gap-4">
+                        <div className="text-center p-3 sm:p-4 bg-green-50 rounded-lg border border-green-200">
+                            <div className="flex items-center justify-center mb-1 sm:mb-2">
+                                <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
                             </div>
-                            <p className="text-2xl font-bold text-green-600">{attempt.correctAnswers}</p>
-                            <p className="text-xs text-green-700 mt-1">Correct</p>
+                            <p className="text-lg sm:text-xl md:text-2xl font-bold text-green-600">{attempt.correctAnswers}</p>
+                            <p className="text-[10px] sm:text-xs text-green-700 mt-0.5 sm:mt-1">Correct</p>
                         </div>
-                        <div className="text-center p-4 bg-red-50 rounded-lg border border-red-200">
-                            <div className="flex items-center justify-center mb-2">
-                                <XCircle className="h-5 w-5 text-red-600" />
+                        <div className="text-center p-3 sm:p-4 bg-red-50 rounded-lg border border-red-200">
+                            <div className="flex items-center justify-center mb-1 sm:mb-2">
+                                <XCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600" />
                             </div>
-                            <p className="text-2xl font-bold text-red-600">{attempt.wrongAnswers}</p>
-                            <p className="text-xs text-red-700 mt-1">Wrong</p>
+                            <p className="text-lg sm:text-xl md:text-2xl font-bold text-red-600">{attempt.wrongAnswers}</p>
+                            <p className="text-[10px] sm:text-xs text-red-700 mt-0.5 sm:mt-1">Wrong</p>
                         </div>
-                        <div className="text-center p-4 bg-gray-50 rounded-lg border border-gray-200">
-                            <div className="flex items-center justify-center mb-2">
-                                <Circle className="h-5 w-5 text-gray-600" />
+                        <div className="text-center p-3 sm:p-4 bg-gray-50 rounded-lg border border-gray-200">
+                            <div className="flex items-center justify-center mb-1 sm:mb-2">
+                                <Circle className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600" />
                             </div>
-                            <p className="text-2xl font-bold text-gray-600">{attempt.unanswered}</p>
+                            <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-600">{attempt.unanswered}</p>
                             <p className="text-xs text-gray-700 mt-1">Unanswered</p>
                         </div>
                     </div>

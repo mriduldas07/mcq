@@ -45,12 +45,12 @@ export default async function ExamsPage() {
     const totalAttempts = exams.reduce((sum, e) => sum + e._count.attempts, 0);
 
     return (
-        <div className="flex-1 space-y-4 sm:space-y-6 overflow-hidden w-full max-w-full">
+        <div className="flex-1 space-y-4 sm:space-y-6 overflow-hidden w-full max-w-full px-3 sm:px-0">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                 <div className="min-w-0 flex-1">
-                    <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Exams</h2>
-                    <p className="text-muted-foreground mt-1 text-sm sm:text-base">Create, manage, and monitor your exams</p>
+                    <h2 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">Exams</h2>
+                    <p className="text-muted-foreground mt-1 text-xs sm:text-sm md:text-base">Create, manage, and monitor your exams</p>
                 </div>
                 <Link href="/dashboard/exams/create" className="w-full sm:w-auto">
                     <Button size="default" className="w-full sm:w-auto">
@@ -60,24 +60,24 @@ export default async function ExamsPage() {
             </div>
 
             {exams.length === 0 ? (
-                <div className="flex min-h-[400px] flex-col items-center justify-center rounded-xl border-2 border-dashed p-12 text-center">
-                    <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-primary/10">
-                        <FileText className="h-10 w-10 text-primary" />
+                <div className="flex min-h-[350px] sm:min-h-[400px] flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 sm:p-8 md:p-12 text-center mx-3 sm:mx-0">
+                    <div className="mx-auto flex h-16 w-16 sm:h-20 sm:w-20 items-center justify-center rounded-full bg-primary/10">
+                        <FileText className="h-8 w-8 sm:h-10 sm:w-10 text-primary" />
                     </div>
-                    <h3 className="mt-6 text-xl font-semibold">Create Your First Exam</h3>
-                    <p className="mt-2 text-sm text-muted-foreground max-w-md">
+                    <h3 className="mt-4 sm:mt-6 text-lg sm:text-xl font-semibold">Create Your First Exam</h3>
+                    <p className="mt-2 text-xs sm:text-sm text-muted-foreground max-w-md px-4">
                         Get started by creating your first exam. Add questions, set duration, and share with students.
                     </p>
-                    <Link href="/dashboard/exams/create" className="mt-6">
-                        <Button size="lg">
-                            <Plus className="mr-2 h-5 w-5" /> Create Exam
+                    <Link href="/dashboard/exams/create" className="mt-4 sm:mt-6">
+                        <Button size="lg" className="text-sm sm:text-base">
+                            <Plus className="mr-2 h-4 w-4 sm:h-5 sm:w-5" /> Create Exam
                         </Button>
                     </Link>
                 </div>
             ) : (
                 <>
                     {/* Statistics Overview */}
-                    <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
+                    <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4 px-3 sm:px-0">
                         <Card>
                             <CardContent className="p-4 sm:pt-6">
                                 <div className="flex items-center justify-between">

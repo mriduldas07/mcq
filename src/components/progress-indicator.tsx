@@ -23,7 +23,7 @@ export function ProgressIndicator({
   onStepClick 
 }: ProgressIndicatorProps) {
   return (
-    <nav aria-label="Progress" className="py-6">
+    <nav aria-label="Progress" className="py-3 sm:py-4 md:py-6">
       <div className="relative">
         <ol className="relative flex items-center justify-between">
           {steps.map((step, stepIdx) => {
@@ -36,13 +36,13 @@ export function ProgressIndicator({
                 key={step.id}
                 className={cn(
                   "relative flex-1 flex flex-col items-center",
-                  stepIdx !== steps.length - 1 && "pr-4"
+                  stepIdx !== steps.length - 1 && "pr-2 sm:pr-3 md:pr-4"
                 )}
               >
                 {/* Connector Line */}
                 {stepIdx !== steps.length - 1 && (
                   <div
-                    className="absolute top-5 left-1/2 w-full h-0.5 -z-0"
+                    className="absolute top-4 sm:top-5 left-1/2 w-full h-0.5 z-0"
                     aria-hidden="true"
                   >
                     <div
@@ -65,10 +65,11 @@ export function ProgressIndicator({
                     isClickable && "cursor-pointer hover:-translate-y-0.5"
                   )}
                 >
-                  <div className="relative mb-3">
+                  <div className="relative mb-2 sm:mb-2.5 md:mb-3">
                     <span
                       className={cn(
-                        "relative z-10 flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all duration-300",
+                        "relative z-10 flex items-center justify-center rounded-full border-2 transition-all duration-300",
+                        "h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10",
                         isCompleted
                           ? "border-primary bg-primary text-primary-foreground shadow-sm"
                           : isCurrent
@@ -77,17 +78,18 @@ export function ProgressIndicator({
                       )}
                     >
                       {isCompleted ? (
-                        <Check className="h-5 w-5" />
+                        <Check className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5" />
                       ) : (
-                        <span className="text-sm font-medium">{stepIdx + 1}</span>
+                        <span className="text-xs sm:text-sm font-medium">{stepIdx + 1}</span>
                       )}
                     </span>
                   </div>
                   
-                  <div className="flex flex-col items-center text-center max-w-[140px]">
+                  <div className="flex flex-col items-center text-center max-w-20 sm:max-w-25 md:max-w-35">
                     <span
                       className={cn(
-                        "text-sm font-medium transition-all duration-300 mb-0.5",
+                        "transition-all duration-300 mb-0.5 font-medium",
+                        "text-[10px] sm:text-xs md:text-sm",
                         isCurrent || isCompleted
                           ? "text-foreground" 
                           : "text-muted-foreground"
@@ -96,7 +98,7 @@ export function ProgressIndicator({
                       {step.label}
                     </span>
                     <span className={cn(
-                      "text-xs transition-colors duration-300 hidden sm:block",
+                      "text-[9px] sm:text-[10px] md:text-xs transition-colors duration-300 hidden sm:block",
                       isCurrent ? "text-muted-foreground" : "text-muted-foreground/60"
                     )}>
                       {step.description}
