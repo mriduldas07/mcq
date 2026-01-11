@@ -108,9 +108,9 @@ model StudentAttempt {
   exam          Exam      @relation(fields: [examId], references: [id], onDelete: Cascade)
   studentName   String
   rollNumber    String?
-  startTime     DateTime? // When exam actually started (server time)
-  endTime       DateTime? // Calculated deadline (server time)
-  startedAt     DateTime  @default(now())
+  startTime     DateTime? // When exam actually started (server time) - set on first fullscreen entry
+  endTime       DateTime? // Calculated deadline (server time) - set on first fullscreen entry
+  startedAt     DateTime? // CRITICAL: Set only when student enters fullscreen for first time (NULL = exam not started)
   completedAt   DateTime?
   submitted     Boolean   @default(false)
   score         Int       @default(0)

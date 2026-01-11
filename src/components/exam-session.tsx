@@ -6,9 +6,9 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { CheckCircle2, Clock, AlertCircle } from "lucide-react";
+import { Clock, AlertCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { submitExamAction, saveAnswerAction, getAttemptStatusAction, recordViolationAction } from "@/actions/student";
+import { submitExamAction, saveAnswerAction, getAttemptStatusAction, recordViolationAction, beginExamTimerAction } from "@/actions/student";
 
 // Types
 type Option = {
@@ -22,6 +22,13 @@ type Question = {
     options: Option[];
 }
 
+// EXAM STATE MACHINE
+enum ExamState {
+    WAITING = "WAITING",     // Not started, waiting for fullscreen
+    RUNNING = "RUNNING",     // Timer active, exam in progress
+    ENDED = "ENDED"          // Time expired or submitted
+}
+
 type ExamSessionProps = {
     examId: string;
     studentName: string;
@@ -29,7 +36,8 @@ type ExamSessionProps = {
     questions: Question[];
     durationMinutes: number;
     attemptId: string;
-    endTime: string; // ISO string from server
+    startedAt: string | null; // ISO string from server (null if not started)
+    endTime: string | null; // ISO string from server (null if not started)
     antiCheatEnabled: boolean;
     maxViolations: number;
 }
@@ -41,49 +49,168 @@ export function ExamSession({
     questions, 
     durationMinutes,
     attemptId,
-    endTime,
+    startedAt: initialStartedAt,
+    endTime: initialEndTime,
     antiCheatEnabled,
     maxViolations
 }: ExamSessionProps) {
     const router = useRouter();
+    
+    // EXAM STATE MACHINE
+    const [examState, setExamState] = useState<ExamState>(
+        initialStartedAt ? ExamState.RUNNING : ExamState.WAITING
+    );
+    
+    // Core exam data
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [answers, setAnswers] = useState<Record<string, string>>({});
     const [timeLeft, setTimeLeft] = useState(0);
+    const [endTime, setEndTime] = useState<string | null>(initialEndTime);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [violations, setViolations] = useState(0);
-    const hasAutoSubmitted = useRef(false);
-    const hasEnteredFullscreen = useRef(false); // Track if user entered fullscreen at least once
-    const [isFullscreen, setIsFullscreen] = useState(false);
-    const [showFullscreenPrompt, setShowFullscreenPrompt] = useState(true);
     
-    // TASK 8: Offline safety
+    // Refs to prevent duplicate actions
+    const hasAutoSubmitted = useRef(false);
+    
+    // Offline safety
     const [isOnline, setIsOnline] = useState(true);
     const [pendingSaves, setPendingSaves] = useState<string[]>([]);
     const syncQueueRef = useRef<Array<{ questionId: string; answer: string }>>([]);
 
-    // TASK: Fullscreen enforcement - Check fullscreen status on mount
+    // =================================================================
+    // INITIALIZATION: Check if exam has already started (page refresh)
+    // =================================================================
     useEffect(() => {
-        if (!antiCheatEnabled) {
-            setIsFullscreen(true); // Skip fullscreen check if anti-cheat disabled
-            setShowFullscreenPrompt(false);
+        const initializeExamState = async () => {
+            if (initialStartedAt && initialEndTime) {
+                // Exam already started - resume
+                setExamState(ExamState.RUNNING);
+                
+                // Check if time has expired
+                const now = new Date().getTime();
+                const end = new Date(initialEndTime).getTime();
+                const remaining = Math.floor((end - now) / 1000);
+                
+                if (remaining <= 0) {
+                    setExamState(ExamState.ENDED);
+                    if (!hasAutoSubmitted.current) {
+                        hasAutoSubmitted.current = true;
+                        handleSubmit(true);
+                    }
+                }
+            } else {
+                // Exam not started - show waiting screen
+                setExamState(ExamState.WAITING);
+            }
+            
+            // Try to restore saved state
+            try {
+                const result = await getAttemptStatusAction(attemptId);
+                if (result.success && result.attempt) {
+                    // Check if already submitted
+                    if (result.attempt.submitted) {
+                        router.push(`/exam/${examId}/result?attemptId=${attemptId}`);
+                        return;
+                    }
+                    
+                    // Restore answers
+                    if (result.attempt.answers) {
+                        setAnswers(result.attempt.answers);
+                    }
+                    
+                    // Restore violations
+                    if (result.attempt.violations) {
+                        setViolations(result.attempt.violations);
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to restore attempt state", e);
+            }
+        };
+        
+        initializeExamState();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [attemptId, examId, initialStartedAt, initialEndTime]);
+
+    // =================================================================
+    // FULLSCREEN HANDLER: Start timer on FIRST fullscreen entry
+    // =================================================================
+    const handleEnterFullscreen = async () => {
+        if (examState !== ExamState.WAITING) return;
+        
+        try {
+            // Request fullscreen
+            if (document.documentElement.requestFullscreen) {
+                await document.documentElement.requestFullscreen();
+            }
+            
+            // Call backend to start timer (THIS IS THE CRITICAL MOMENT)
+            console.log('🚀 Starting exam timer on server...');
+            const result = await beginExamTimerAction(attemptId);
+            
+            if (result.success && result.startedAt && result.endTime) {
+                // Timer started successfully
+                setEndTime(result.endTime);
+                setExamState(ExamState.RUNNING);
+                
+                console.log('✅ EXAM STARTED! Timer will end at:', result.endTime);
+            } else {
+                console.error('Failed to start timer:', result.error);
+                alert('Failed to start exam timer. Please try again.');
+            }
+        } catch (err) {
+            console.error("Failed to enter fullscreen:", err);
+            alert("Please allow fullscreen mode to start the exam.");
+        }
+    };
+
+    // =================================================================
+    // TIMER: Server-controlled, NEVER pauses after starting
+    // =================================================================
+    useEffect(() => {
+        // Only run timer if exam is RUNNING and we have an endTime
+        if (examState !== ExamState.RUNNING || !endTime) {
             return;
         }
 
-        // Check if already in fullscreen
-        if (document.fullscreenElement) {
-            setIsFullscreen(true);
-            setShowFullscreenPrompt(false);
-        } else {
-            // Show prompt - user must click to enter fullscreen (browser security requirement)
-            setShowFullscreenPrompt(true);
-        }
-    }, [antiCheatEnabled]);
+        const calculateTimeLeft = () => {
+            const now = new Date().getTime();
+            const end = new Date(endTime).getTime();
+            const diff = Math.floor((end - now) / 1000);
+            return Math.max(0, diff);
+        };
 
-    // TASK 8: Offline detection
+        // Set initial time
+        setTimeLeft(calculateTimeLeft());
+
+        // Update every second - NEVER PAUSES
+        const timer = setInterval(() => {
+            const remaining = calculateTimeLeft();
+            setTimeLeft(remaining);
+
+            if (remaining <= 0) {
+                clearInterval(timer);
+                setExamState(ExamState.ENDED);
+                
+                // Auto-submit when time expires
+                if (!hasAutoSubmitted.current) {
+                    console.log('⏰ TIME EXPIRED - Auto-submitting exam');
+                    hasAutoSubmitted.current = true;
+                    handleSubmit(true);
+                }
+            }
+        }, 1000);
+
+        return () => clearInterval(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [examState, endTime]);
+
+    // =================================================================
+    // OFFLINE DETECTION
+    // =================================================================
     useEffect(() => {
         const handleOnline = () => {
             setIsOnline(true);
-            // Sync pending saves when back online
             syncPendingAnswers();
         };
 
@@ -93,17 +220,18 @@ export function ExamSession({
 
         window.addEventListener('online', handleOnline);
         window.addEventListener('offline', handleOffline);
-
-        // Set initial state
         setIsOnline(navigator.onLine);
 
         return () => {
             window.removeEventListener('online', handleOnline);
             window.removeEventListener('offline', handleOffline);
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // TASK 8: Load answers from local storage on mount
+    // =================================================================
+    // LOCAL STORAGE: Load and save answers
+    // =================================================================
     useEffect(() => {
         const storageKey = `exam_${attemptId}_answers`;
         const savedAnswers = localStorage.getItem(storageKey);
@@ -118,7 +246,6 @@ export function ExamSession({
         }
     }, [attemptId]);
 
-    // TASK 8: Save answers to local storage whenever they change
     useEffect(() => {
         if (Object.keys(answers).length > 0) {
             const storageKey = `exam_${attemptId}_answers`;
@@ -126,7 +253,7 @@ export function ExamSession({
         }
     }, [answers, attemptId]);
 
-    // TASK 8: Sync pending answers when connection is restored
+    // Sync pending answers when connection is restored
     const syncPendingAnswers = async () => {
         if (syncQueueRef.current.length === 0) return;
 
@@ -145,126 +272,28 @@ export function ExamSession({
         }
     };
 
-    // TASK 1: SERVER-CONTROLLED TIMER - Only start when user enters fullscreen
+    // =================================================================
+    // ANTI-CHEAT: Tab switch detection (NEVER PAUSES TIMER)
+    // =================================================================
     useEffect(() => {
-        // Don't start timer if anti-cheat is enabled and user hasn't entered fullscreen
-        if (antiCheatEnabled && !hasEnteredFullscreen.current) {
-            console.log('⏸️ Timer paused - waiting for user to enter fullscreen');
-            return;
-        }
-
-        const calculateTimeLeft = () => {
-            const now = new Date().getTime();
-            const end = new Date(endTime).getTime();
-            const diff = Math.floor((end - now) / 1000);
-            return Math.max(0, diff);
-        };
-
-        // Set initial time
-        setTimeLeft(calculateTimeLeft());
-        console.log('✅ Timer started!');
-
-        // Update every second ONLY when in fullscreen (or anti-cheat disabled)
-        const timer = setInterval(() => {
-            // Pause timer if user exits fullscreen
-            if (antiCheatEnabled && !document.fullscreenElement) {
-                console.log('⏸️ Timer paused - user exited fullscreen');
-                return;
-            }
-
-            const remaining = calculateTimeLeft();
-            setTimeLeft(remaining);
-
-            if (remaining <= 0) {
-                clearInterval(timer);
-            }
-        }, 1000);
-
-        return () => clearInterval(timer);
-    }, [endTime, antiCheatEnabled, isFullscreen]);
-
-    // Handle page refresh - restore attempt state (ONE TIME ONLY)
-    useEffect(() => {
-        let isMounted = true;
-        
-        const restoreAttemptState = async () => {
-            try {
-                const result = await getAttemptStatusAction(attemptId);
-                if (result.success && result.attempt && isMounted) {
-                    // If already submitted, redirect to results
-                    if (result.attempt.submitted) {
-                        router.push(`/exam/${examId}/result?attemptId=${attemptId}`);
-                        return;
-                    }
-                    // Restore answers
-                    if (result.attempt.answers) {
-                        setAnswers(result.attempt.answers);
-                    }
-                }
-            } catch (e) {
-                console.error("Failed to restore attempt state", e);
-            }
-        };
-
-        restoreAttemptState();
-        
-        return () => {
-            isMounted = false;
-        };
-    }, [attemptId, examId, router]);
-
-    // Auto-submit when time expires (with protection against premature triggers)
-    useEffect(() => {
-        // Only auto-submit if:
-        // 1. Timer actually reached 0
-        // 2. Not already submitting
-        // 3. Haven't already auto-submitted
-        // 4. User has started the exam (entered fullscreen)
-        if (timeLeft === 0 && !isSubmitting && !hasAutoSubmitted.current && hasEnteredFullscreen.current) {
-            console.log('⏰ Timer expired - auto-submitting exam');
-            hasAutoSubmitted.current = true;
-            handleSubmit(true);
-        }
-    }, [timeLeft, isSubmitting]);
-
-    // TASK 6: Anti-Cheat with proper violation-based auto-submit
-    useEffect(() => {
-        if (!antiCheatEnabled) return; // Skip if anti-cheat is disabled
+        if (!antiCheatEnabled || examState !== ExamState.RUNNING) return;
         
         const handleVisibilityChange = async () => {
-            if (!document.hidden) {
-                // Page became visible - do nothing
-                console.log('✅ Tab is now visible');
-            } else {
-                // CRITICAL: Only track violations if user has started the exam (entered fullscreen)
-                if (!hasEnteredFullscreen.current) {
-                    console.log('User has not started exam yet - not recording tab switch violation');
-                    return;
-                }
+            if (document.hidden) {
+                // Tab switched away - record violation
+                console.log(`⚠️ Tab switch detected`);
                 
-                // Track tab switches for anti-cheat
-                console.log(`⚠️ Tab switch detected while in exam.`);
-                
-                // Record violation on server - ONLY increment based on server response
                 try {
                     const result = await recordViolationAction(attemptId);
                     
                     if (result.success && result.violations !== undefined) {
-                        // Update violations from server (source of truth)
                         setViolations(result.violations);
-                        console.log(`Server recorded violation. Count: ${result.violations}/${maxViolations}`);
-                        
-                        // Check if should auto-submit
-                        console.log(`🔍 Checking auto-submit: violations=${result.violations}, max=${maxViolations}, hasAutoSubmitted=${hasAutoSubmitted.current}`);
+                        console.log(`Violation recorded. Count: ${result.violations}/${maxViolations}`);
                         
                         if (result.violations >= maxViolations && !hasAutoSubmitted.current) {
-                            console.log(`🚨🚨🚨 TAB SWITCH - EXCEEDED LIMIT (${result.violations}/${maxViolations}) - FORCE AUTO-SUBMIT NOW! 🚨🚨🚨`);
+                            console.log(`🚨 TAB SWITCH - EXCEEDED LIMIT - AUTO-SUBMIT`);
                             hasAutoSubmitted.current = true;
-                            
-                            // Submit immediately - no delay needed
                             handleSubmit(true);
-                        } else if (result.violations >= maxViolations) {
-                            console.log(`⚠️ Already flagged for auto-submit, waiting...`);
                         }
                     }
                 } catch (e) {
@@ -275,109 +304,53 @@ export function ExamSession({
 
         document.addEventListener("visibilitychange", handleVisibilityChange);
         return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-    }, [endTime, isSubmitting, attemptId, antiCheatEnabled, maxViolations]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [examState, antiCheatEnabled, attemptId, maxViolations]);
 
-    // TASK 6: Window blur detection - DISABLED (causes false positives)
-    // Commenting out because blur fires on normal page interactions
-    /*
+    // =================================================================
+    // ANTI-CHEAT: Fullscreen exit detection (NEVER PAUSES TIMER)
+    // =================================================================
     useEffect(() => {
-        if (!antiCheatEnabled) return;
-        
-        const handleBlur = async () => {
-            setViolations(v => v + 1);
-            
-            // Record violation on server
-            try {
-                const result = await recordViolationAction(attemptId);
-                if (result.success && result.forceSubmit && !hasAutoSubmitted.current) {
-                    hasAutoSubmitted.current = true;
-                    alert(`Too many violations detected (${result.violations}/${result.maxViolations}). Exam will be auto-submitted.`);
-                    await handleSubmit(true);
-                }
-            } catch (e) {
-                console.error("Failed to record violation", e);
-            }
-        };
-
-        window.addEventListener("blur", handleBlur);
-        return () => window.removeEventListener("blur", handleBlur);
-    }, [attemptId, antiCheatEnabled]);
-    */
-
-    // TASK 6: Fullscreen exit detection with proper auto-submit
-    useEffect(() => {
-        if (!antiCheatEnabled) return; // Skip if anti-cheat is disabled
+        if (!antiCheatEnabled || examState !== ExamState.RUNNING) return;
         
         const handleFullscreenChange = async () => {
             if (!document.fullscreenElement) {
-                // User exited fullscreen
-                setIsFullscreen(false);
+                // User exited fullscreen - record violation
+                console.log(`⚠️ Fullscreen exit detected`);
                 
-                console.log(`⚠️ Fullscreen exit detected.`);
-                
-                // Show re-enter fullscreen prompt
-                setShowFullscreenPrompt(true);
-                
-                // CRITICAL: Only record violation if user has entered fullscreen at least once
-                // This prevents recording a violation on page load when user hasn't entered fullscreen yet
-                if (!hasEnteredFullscreen.current) {
-                    console.log('User has not entered fullscreen yet - not recording violation');
-                    return;
-                }
-                
-                // Record violation on server - ONLY increment based on server response
                 try {
                     const result = await recordViolationAction(attemptId);
                     
                     if (result.success && result.violations !== undefined) {
-                        // Update violations from server (source of truth)
                         setViolations(result.violations);
-                        console.log(`Server recorded violation. Count: ${result.violations}/${maxViolations}`);
-                        
-                        // Check if should auto-submit
-                        console.log(`🔍 Checking auto-submit: violations=${result.violations}, max=${maxViolations}, hasAutoSubmitted=${hasAutoSubmitted.current}`);
+                        console.log(`Violation recorded. Count: ${result.violations}/${maxViolations}`);
                         
                         if (result.violations >= maxViolations && !hasAutoSubmitted.current) {
-                            console.log(`🚨🚨🚨 FULLSCREEN EXIT - EXCEEDED LIMIT (${result.violations}/${maxViolations}) - FORCE AUTO-SUBMIT NOW! 🚨🚨🚨`);
+                            console.log(`🚨 FULLSCREEN EXIT - EXCEEDED LIMIT - AUTO-SUBMIT`);
                             hasAutoSubmitted.current = true;
-                            
-                            // Submit immediately - no delay needed
                             handleSubmit(true);
-                        } else if (result.violations >= maxViolations) {
-                            console.log(`⚠️ Already flagged for auto-submit, waiting...`);
                         }
                     }
                 } catch (e) {
                     console.error("Failed to record violation", e);
-                }
-            } else {
-                // User entered fullscreen
-                const wasFirstEntry = !hasEnteredFullscreen.current;
-                
-                setIsFullscreen(true);
-                setShowFullscreenPrompt(false);
-                
-                // Mark that user has entered fullscreen
-                if (wasFirstEntry) {
-                    hasEnteredFullscreen.current = true;
-                    console.log('✅ User entered fullscreen for the first time - timer will start now!');
-                } else {
-                    console.log('✅ User re-entered fullscreen - timer resuming');
                 }
             }
         };
 
         document.addEventListener("fullscreenchange", handleFullscreenChange);
         return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
-    }, [attemptId, antiCheatEnabled, maxViolations]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [examState, antiCheatEnabled, attemptId, maxViolations]);
 
-    // TASK 8: Enhanced auto-save with offline support
+    // =================================================================
+    // AUTO-SAVE: Save answers with offline support
+    // =================================================================
     useEffect(() => {
+        if (examState !== ExamState.RUNNING) return;
+        
         const autoSave = async () => {
-            // Don't save if no answers yet or already submitting
             if (Object.keys(answers).length === 0 || isSubmitting) return;
 
-            // Get the last answered question
             const questionIds = Object.keys(answers);
             const lastQuestionId = questionIds[questionIds.length - 1];
             const lastAnswer = answers[lastQuestionId];
@@ -385,16 +358,13 @@ export function ExamSession({
             if (lastQuestionId && lastAnswer) {
                 // If offline, add to sync queue
                 if (!isOnline) {
-                    // Check if not already in queue
                     const existingIndex = syncQueueRef.current.findIndex(
                         item => item.questionId === lastQuestionId
                     );
                     
                     if (existingIndex >= 0) {
-                        // Update existing item
                         syncQueueRef.current[existingIndex].answer = lastAnswer;
                     } else {
-                        // Add new item
                         syncQueueRef.current.push({ questionId: lastQuestionId, answer: lastAnswer });
                     }
                     
@@ -411,17 +381,11 @@ export function ExamSession({
                 try {
                     const result = await saveAnswerAction(attemptId, lastQuestionId, lastAnswer);
                     
-                    // Remove from pending if successful
                     if (result.success) {
                         setPendingSaves(prev => prev.filter(id => id !== lastQuestionId));
                     }
-                    
-                    // DON'T force submit on auto-save - let the timer handle it
-                    // The forceSubmit from saveAnswer was causing premature submissions
-                    // Only the timer (timeLeft === 0) should trigger auto-submit
                 } catch (e) {
                     console.error("Auto-save failed", e);
-                    // Add to queue for retry
                     syncQueueRef.current.push({ questionId: lastQuestionId, answer: lastAnswer });
                     setPendingSaves(prev => {
                         if (!prev.includes(lastQuestionId)) {
@@ -433,12 +397,17 @@ export function ExamSession({
             }
         };
 
-        // Debounce auto-save
         const timeout = setTimeout(autoSave, 500);
         return () => clearTimeout(timeout);
-    }, [answers, attemptId, isSubmitting, isOnline]);
+    }, [answers, attemptId, isSubmitting, isOnline, examState]);
 
+    // =================================================================
+    // HANDLERS
+    // =================================================================
     const handleOptionSelect = (questionId: string, optionId: string) => {
+        // Only allow if exam is running
+        if (examState !== ExamState.RUNNING) return;
+        
         setAnswers(prev => ({
             ...prev,
             [questionId]: optionId
@@ -451,9 +420,9 @@ export function ExamSession({
             return;
         }
 
-        console.log(auto ? '🤖 AUTO-SUBMITTING exam (violations or timer)' : '✅ MANUAL submission by user');
+        console.log(auto ? '🤖 AUTO-SUBMITTING exam' : '✅ MANUAL submission');
 
-        // TASK 8: Block submission if offline with pending saves
+        // Block submission if offline with pending saves
         if (!isOnline && pendingSaves.length > 0) {
             if (!auto) {
                 alert("Cannot submit exam while offline. Please wait for connection to sync your answers.");
@@ -462,12 +431,12 @@ export function ExamSession({
         }
 
         setIsSubmitting(true);
+        setExamState(ExamState.ENDED);
 
         try {
-            // CRITICAL FIX: Save all current answers before submitting (especially for auto-submit)
-            console.log('💾 Saving all answers before submission...', { answerCount: Object.keys(answers).length, auto });
+            // Save all current answers before submitting
+            console.log('💾 Saving all answers before submission...');
             
-            // Save each answer to ensure server has latest data
             const answerEntries = Object.entries(answers);
             for (const [questionId, optionId] of answerEntries) {
                 try {
@@ -477,10 +446,9 @@ export function ExamSession({
                 }
             }
             
-            // TASK 8: Ensure all pending saves are synced before submission
+            // Ensure all pending saves are synced
             if (pendingSaves.length > 0) {
                 await syncPendingAnswers();
-                // Wait a moment for sync to complete
                 await new Promise(resolve => setTimeout(resolve, 1000));
             }
 
@@ -488,12 +456,11 @@ export function ExamSession({
             const result = await submitExamAction(attemptId);
             
             if (result.success) {
-                console.log('🎉 Exam submitted successfully - redirecting to results');
-                // TASK 8: Clear local storage after successful submission
+                console.log('🎉 Exam submitted successfully');
+                // Clear local storage
                 const storageKey = `exam_${attemptId}_answers`;
                 localStorage.removeItem(storageKey);
                 
-                // Use replace instead of push for smoother transition (no back button issues)
                 router.replace(`/exam/${examId}/result?attemptId=${attemptId}`);
             } else {
                 console.error('❌ Submission failed:', result.error);
@@ -501,6 +468,7 @@ export function ExamSession({
                     alert(result.error || "Submission failed");
                 }
                 setIsSubmitting(false);
+                setExamState(ExamState.RUNNING); // Allow retry
             }
         } catch (e) {
             console.error("❌ Submit exception:", e);
@@ -508,6 +476,7 @@ export function ExamSession({
                 alert("An error occurred during submission. Please try again.");
             }
             setIsSubmitting(false);
+            setExamState(ExamState.RUNNING); // Allow retry
         }
     };
 
@@ -519,48 +488,43 @@ export function ExamSession({
 
     const currentQuestion = questions[currentQuestionIndex];
     const isLastQuestion = currentQuestionIndex === questions.length - 1;
-
-    // Progress bar
     const progress = ((Object.keys(answers).length) / questions.length) * 100;
 
-    // Handler to re-enter fullscreen
-    const handleEnterFullscreen = async () => {
-        try {
-            if (document.documentElement.requestFullscreen) {
-                await document.documentElement.requestFullscreen();
-                setIsFullscreen(true);
-                setShowFullscreenPrompt(false);
-            }
-        } catch (err) {
-            console.error("Failed to enter fullscreen:", err);
-            alert("Please allow fullscreen mode to continue the exam.");
-        }
-    };
-
-    return (
-        <div className="flex flex-col min-h-screen bg-muted/20">
-            {/* Fullscreen Prompt Overlay */}
-            {antiCheatEnabled && showFullscreenPrompt && (
+    // =================================================================
+    // RENDER: WAITING STATE
+    // =================================================================
+    if (examState === ExamState.WAITING) {
+        return (
+            <div className="flex flex-col min-h-screen bg-muted/20">
                 <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-                    <Card className="max-w-md w-full">
+                    <Card className="max-w-lg w-full">
                         <CardHeader>
-                            <CardTitle className="text-center text-2xl">🔒 Fullscreen Required</CardTitle>
+                            <CardTitle className="text-center text-2xl">
+                                {antiCheatEnabled ? "🔒 Exam Ready" : "📝 Exam Ready"}
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <p className="text-center text-muted-foreground">
-                                This exam requires fullscreen mode for security purposes.
-                            </p>
-                            <div className="rounded-md bg-yellow-50 p-4 text-sm text-yellow-800 border border-yellow-200">
-                                <strong>⚠️ Important:</strong>
-                                <ul className="list-disc pl-4 mt-2 space-y-1">
-                                    <li>You must stay in fullscreen mode</li>
-                                    <li>Exiting fullscreen will count as a violation</li>
-                                    <li>After {maxViolations} violations, exam will auto-submit</li>
-                                </ul>
+                            <div className="text-center space-y-2">
+                                <p className="text-lg font-medium">{studentName}</p>
+                                <p className="text-sm text-muted-foreground">Roll: {rollNumber}</p>
+                                <p className="text-sm text-muted-foreground">Duration: {durationMinutes} minutes</p>
+                                <p className="text-sm text-muted-foreground">Questions: {questions.length}</p>
                             </div>
-                            {violations > 0 && (
-                                <div className="rounded-md bg-red-50 p-3 text-sm text-red-800 border border-red-200">
-                                    <strong>Current violations: {violations}/{maxViolations}</strong>
+                            
+                            {antiCheatEnabled ? (
+                                <div className="rounded-md bg-yellow-50 p-4 text-sm text-yellow-800 border border-yellow-200">
+                                    <strong>⚠️ Important Rules:</strong>
+                                    <ul className="list-disc pl-4 mt-2 space-y-1">
+                                        <li>Click below to enter fullscreen and START the exam timer</li>
+                                        <li>Timer will NOT pause once started</li>
+                                        <li>Exiting fullscreen or switching tabs = violation</li>
+                                        <li>After {maxViolations} violations, exam will auto-submit</li>
+                                        <li>You cannot gain extra time by delaying fullscreen entry</li>
+                                    </ul>
+                                </div>
+                            ) : (
+                                <div className="rounded-md bg-blue-50 p-4 text-sm text-blue-800 border border-blue-200">
+                                    <p>Click below to start your exam. Your timer will begin immediately.</p>
                                 </div>
                             )}
                         </CardContent>
@@ -568,20 +532,28 @@ export function ExamSession({
                             <Button 
                                 onClick={handleEnterFullscreen}
                                 className="w-full text-lg h-12"
+                                size="lg"
                             >
-                                Enter Fullscreen & Continue
+                                {antiCheatEnabled ? "Enter Fullscreen & Start Exam" : "Start Exam"}
                             </Button>
                         </CardFooter>
                     </Card>
                 </div>
-            )}
-            {/* Header / Top Bar */}
+            </div>
+        );
+    }
+
+    // =================================================================
+    // RENDER: RUNNING/ENDED STATE
+    // =================================================================
+    return (
+        <div className="flex flex-col min-h-screen bg-muted/20">
+            {/* Header */}
             <header className="sticky top-0 z-10 bg-background border-b shadow-sm p-4">
                 <div className="container mx-auto flex items-center justify-between">
                     <div>
                         <h1 className="font-semibold">{studentName}</h1>
                         <p className="text-xs text-muted-foreground">Roll: {rollNumber}</p>
-                        {/* TASK 8: Offline indicator */}
                         {!isOnline && (
                             <p className="text-xs text-orange-600 font-medium">⚠️ Offline - Changes saved locally</p>
                         )}
@@ -600,8 +572,7 @@ export function ExamSession({
                         variant="destructive"
                         size="sm"
                         onClick={() => handleSubmit(false)}
-                        disabled={isSubmitting || (!isOnline && pendingSaves.length > 0)}
-                        title={!isOnline && pendingSaves.length > 0 ? "Cannot submit while offline with pending changes" : ""}
+                        disabled={isSubmitting || examState === ExamState.ENDED || (!isOnline && pendingSaves.length > 0)}
                     >
                         {isSubmitting ? "Submitting..." : "Finish Exam"}
                     </Button>
@@ -612,19 +583,15 @@ export function ExamSession({
                         violations >= maxViolations - 1 ? 'bg-orange-100 text-orange-700' :
                         'bg-yellow-100 text-yellow-700'
                     }`}>
-                        ⚠️ Warning: You have {violations} violation{violations !== 1 ? 's' : ''} (max: {maxViolations}).
+                        ⚠️ Warning: {violations} violation{violations !== 1 ? 's' : ''} (max: {maxViolations})
                         {violations >= maxViolations - 1 && violations < maxViolations && (
-                            <span className="font-bold"> One more will auto-submit your exam!</span>
-                        )}
-                        {violations >= maxViolations && (
-                            <span className="font-bold"> Exam will be submitted!</span>
+                            <span className="font-bold"> - One more will auto-submit!</span>
                         )}
                     </div>
                 )}
-                {/* Progress Bar */}
                 <div className="h-1 w-full bg-secondary mt-0">
                     <div
-                        className="h-full bg-primary transition-all duration-300 ease-out"
+                        className="h-full bg-primary transition-all duration-300"
                         style={{ width: `${progress}%` }}
                     />
                 </div>
@@ -636,11 +603,11 @@ export function ExamSession({
                     <Card className="min-h-100 flex flex-col">
                         <CardHeader className="pb-5">
                             <div className="flex justify-between items-center mb-5">
-                                <span className="text-sm font-medium text-muted-foreground tracking-tight">
+                                <span className="text-sm font-medium text-muted-foreground">
                                     Question {currentQuestionIndex + 1} of {questions.length}
                                 </span>
                             </div>
-                            <CardTitle className="text-[17px] md:text-[19px] font-medium leading-[1.65] tracking-[-0.01em]">
+                            <CardTitle className="text-[17px] md:text-[19px] font-medium leading-[1.65]">
                                 {currentQuestion.text}
                             </CardTitle>
                         </CardHeader>
@@ -648,19 +615,22 @@ export function ExamSession({
                             <RadioGroup
                                 value={answers[currentQuestion.id] || ""}
                                 onValueChange={(val: string) => handleOptionSelect(currentQuestion.id, val)}
+                                disabled={examState === ExamState.ENDED}
                                 className="space-y-3"
                             >
                                 {currentQuestion.options.map((opt) => (
                                     <div
                                         key={opt.id}
                                         className={cn(
-                                            "flex items-center space-x-3 border rounded-lg p-4 transition-all cursor-pointer hover:bg-accent min-h-[52px]",
+                                            "flex items-center space-x-3 border rounded-lg p-4 transition-all min-h-[52px]",
+                                            examState === ExamState.RUNNING && "cursor-pointer hover:bg-accent",
+                                            examState === ExamState.ENDED && "opacity-60",
                                             answers[currentQuestion.id] === opt.id ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-input"
                                         )}
                                         onClick={() => handleOptionSelect(currentQuestion.id, opt.id)}
                                     >
                                         <RadioGroupItem value={opt.id} id={opt.id} className="shrink-0" />
-                                        <Label htmlFor={opt.id} className="flex-1 cursor-pointer font-normal text-[15px] md:text-base leading-[1.6] tracking-[-0.01em]">
+                                        <Label htmlFor={opt.id} className="flex-1 cursor-pointer font-normal text-[15px] md:text-base leading-[1.6]">
                                             {opt.text}
                                         </Label>
                                     </div>
@@ -671,17 +641,23 @@ export function ExamSession({
                             <Button
                                 variant="outline"
                                 onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))}
-                                disabled={currentQuestionIndex === 0}
+                                disabled={currentQuestionIndex === 0 || examState === ExamState.ENDED}
                             >
                                 Previous
                             </Button>
 
                             {isLastQuestion ? (
-                                <Button onClick={() => handleSubmit(false)} disabled={isSubmitting}>
+                                <Button 
+                                    onClick={() => handleSubmit(false)} 
+                                    disabled={isSubmitting || examState === ExamState.ENDED}
+                                >
                                     {isSubmitting ? "Submitting..." : "Submit Exam"}
                                 </Button>
                             ) : (
-                                <Button onClick={() => setCurrentQuestionIndex(prev => Math.min(questions.length - 1, prev + 1))}>
+                                <Button 
+                                    onClick={() => setCurrentQuestionIndex(prev => Math.min(questions.length - 1, prev + 1))}
+                                    disabled={examState === ExamState.ENDED}
+                                >
                                     Next Question
                                 </Button>
                             )}

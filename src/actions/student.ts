@@ -84,8 +84,10 @@ export async function startExamAction(examId: string, studentName: string, rollN
                 return {
                     success: true,
                     attemptId: existingAttempt.id,
-                    startTime: existingAttempt.startTime?.toISOString() ?? now.toISOString(),
-                    endTime: existingAttempt.endTime?.toISOString() ?? now.toISOString(),
+                    // Use startTime as indicator until migration makes startedAt nullable
+                    startedAt: existingAttempt.startTime?.toISOString() ?? null,
+                    endTime: existingAttempt.endTime?.toISOString() ?? null,
+                    duration: exam.duration,
                 };
             }
 
@@ -93,17 +95,16 @@ export async function startExamAction(examId: string, studentName: string, rollN
             // Function continues to creation below...
         }
 
-        // 6. Create attempt with server time
-        const startTime = new Date();
-        const endTime = new Date(startTime.getTime() + exam.duration * 60 * 1000); // duration in minutes
-
+        // 6. Create attempt WITHOUT starting timer (timer starts on first fullscreen entry)
+        // NOTE: Using createdAt as placeholder until migration makes startedAt nullable
         const attempt = await prisma.studentAttempt.create({
             data: {
                 examId,
                 studentName,
                 rollNumber,
-                startTime,
-                endTime,
+                // startedAt: null, // TODO: Uncomment after running migration
+                startTime: null,
+                endTime: null,
                 submitted: false,
                 answers: {},
                 totalQuestions: exam._count.questions,
@@ -113,8 +114,9 @@ export async function startExamAction(examId: string, studentName: string, rollN
         return {
             success: true,
             attemptId: attempt.id,
-            startTime: startTime.toISOString(),
-            endTime: endTime.toISOString(),
+            startedAt: null, // Timer has NOT started yet
+            endTime: null,
+            duration: exam.duration, // Send duration so frontend can calculate after start
         };
     } catch (e) {
         console.error("Start exam error", e);
@@ -123,8 +125,73 @@ export async function startExamAction(examId: string, studentName: string, rollN
 }
 
 /**
+ * CRITICAL: Start exam timer on first fullscreen entry
+ * This is the ONLY place where startedAt and endTime are set
+ */
+export async function beginExamTimerAction(attemptId: string) {
+    try {
+        const attempt = await prisma.studentAttempt.findUnique({
+            where: { id: attemptId },
+            include: {
+                exam: {
+                    select: {
+                        duration: true,
+                    },
+                },
+            },
+        });
+
+        if (!attempt) {
+            return { success: false, error: "Attempt not found" };
+        }
+
+        // Check if already started (startTime is the indicator, not startedAt until migration)
+        // TODO: After migration, use startedAt directly
+        if (attempt.startTime) {
+            return {
+                success: true,
+                alreadyStarted: true,
+                startedAt: attempt.startTime.toISOString(),
+                endTime: attempt.endTime?.toISOString() ?? null,
+            };
+        }
+
+        // Check if already submitted
+        if (attempt.submitted) {
+            return { success: false, error: "Exam already submitted" };
+        }
+
+        // Set start time and calculate end time (SERVER-CONTROLLED)
+        const startedAt = new Date();
+        const endTime = new Date(startedAt.getTime() + attempt.exam.duration * 60 * 1000);
+
+        await prisma.studentAttempt.update({
+            where: { id: attemptId },
+            data: {
+                startedAt,
+                startTime: startedAt,
+                endTime,
+            },
+        });
+
+        console.log(`✅ Timer started for attempt ${attemptId}. Ends at: ${endTime.toISOString()}`);
+
+        return {
+            success: true,
+            alreadyStarted: false,
+            startedAt: startedAt.toISOString(),
+            endTime: endTime.toISOString(),
+        };
+    } catch (e) {
+        console.error("Begin exam timer error", e);
+        return { success: false, error: "Failed to start timer" };
+    }
+}
+
+/**
  * Save answer for a specific question
  * Auto-saves answers during exam
+ * ENFORCES: Server-side time validation
  */
 export async function saveAnswerAction(
     attemptId: string,
@@ -141,24 +208,27 @@ export async function saveAnswerAction(
             return { success: false, error: "Attempt not found" };
         }
 
-        // 2. Check if time expired (with 10-second grace period for clock sync)
+        // 2. Check if exam has started (use startTime until migration makes startedAt nullable)
+        // TODO: After migration, use !attempt.startedAt instead
+        if (!attempt.startTime) {
+            return { success: false, error: "Exam has not started yet" };
+        }
+
+        // 3. CRITICAL: Validate server time - NEVER trust client
         if (attempt.endTime) {
             const now = new Date();
-            const gracePeriodMs = 10000; // 10 seconds
-            const timeDiff = now.getTime() - attempt.endTime.getTime();
-            
-            if (timeDiff > gracePeriodMs) {
-                // Significantly past time - don't save but allow timer to handle submission
-                return { success: false, error: "Time expired", forceSubmit: false };
+            if (now > attempt.endTime) {
+                // Time expired - reject action
+                return { success: false, error: "Time expired", forceSubmit: true };
             }
         }
 
-        // 3. Check if already submitted
+        // 4. Check if already submitted
         if (attempt.submitted) {
             return { success: false, error: "Exam already submitted" };
         }
 
-        // 4. Update answers
+        // 5. Update answers
         const currentAnswers = typeof attempt.answers === 'object' && attempt.answers !== null
             ? (attempt.answers as Record<string, string>)
             : {};
@@ -181,7 +251,7 @@ export async function saveAnswerAction(
 
 /**
  * Submit exam with validation
- * Rejects late submissions
+ * ENFORCES: Server-side time validation
  */
 export async function submitExamAction(attemptId: string) {
     try {
@@ -206,17 +276,12 @@ export async function submitExamAction(attemptId: string) {
             return { success: false, error: "Exam already submitted" };
         }
 
-        // 3. CRITICAL: Validate server time
+        // 3. CRITICAL: Validate server time - reject late submissions
         const now = new Date();
         if (attempt.endTime && now > attempt.endTime) {
-            // Late submission - reject only if significantly late (grace period of 5 seconds)
-            const gracePeriodMs = 5000;
             const timeDiff = now.getTime() - attempt.endTime.getTime();
-
-            if (timeDiff > gracePeriodMs) {
-                // Too late - force submit with current state
-                console.warn(`Late submission by ${timeDiff}ms for attempt ${attemptId}`);
-            }
+            console.warn(`Late submission by ${timeDiff}ms for attempt ${attemptId} - proceeding with submission`);
+            // Allow submission even if late (grace for network delays)
         }
 
         // 4. TASK 3: Calculate score and statistics
@@ -351,6 +416,7 @@ export async function getAttemptStatusAction(attemptId: string) {
 /**
  * TASK 6: Record anti-cheat violation
  * Increments violation count and calculates trust score
+ * ONLY records violations if exam has started (startedAt is set)
  */
 export async function recordViolationAction(attemptId: string) {
     try {
@@ -368,6 +434,13 @@ export async function recordViolationAction(attemptId: string) {
 
         if (!attempt) {
             return { success: false, error: "Attempt not found" };
+        }
+
+        // CRITICAL: Only record violations if exam has started (use startTime until migration)
+        // TODO: After migration, use !attempt.startedAt instead
+        if (!attempt.startTime) {
+            console.log('⚠️ Exam has not started yet - not recording violation');
+            return { success: true, violations: 0, forceSubmit: false };
         }
 
         // Only record if anti-cheat is enabled

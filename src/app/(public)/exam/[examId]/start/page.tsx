@@ -49,8 +49,9 @@ export default async function ExamStartPage({
         );
     }
     
-    // At this point, TypeScript knows success is true, so attemptId and endTime exist
-    if (!startResult.attemptId || !startResult.endTime) {
+    // At this point, TypeScript knows success is true, so attemptId exists
+    // endTime can be null if exam hasn't started yet (waiting for fullscreen)
+    if (!startResult.attemptId) {
         return (
             <div className="min-h-screen flex items-center justify-center">
                 <div className="text-center">
@@ -139,6 +140,7 @@ export default async function ExamStartPage({
             questions={questions}
             durationMinutes={exam.duration}
             attemptId={startResult.attemptId}
+            startedAt={startResult.startedAt}
             endTime={startResult.endTime}
             antiCheatEnabled={exam.antiCheatEnabled}
             maxViolations={exam.maxViolations}
