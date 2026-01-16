@@ -1,218 +1,389 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check, Sparkles, Loader2 } from "lucide-react";
-import { purchaseOneTimeExamAction, createProSubscriptionAction } from "@/actions/payment";
-import { useRouter } from "next/navigation";
+import { Check, Sparkles, Loader2, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
+import { purchaseOneTimeExamAction, createProSubscriptionAction, cancelSubscriptionAction } from "@/actions/payment";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
-// Paddle.js types
-declare global {
-    interface Window {
-        Paddle?: any;
-    }
-}
+// ============================================================================
+// TYPES
+// ============================================================================
 
 interface BillingClientProps {
     isPro: boolean;
     freeExamsRemaining: number;
     oneTimeExamsRemaining: number;
+    subscription?: {
+        id: string;
+        plan: string;
+        status: string;
+        currentPeriodEnd: Date;
+        cancelAtPeriodEnd: boolean;
+    } | null;
     payments: Array<{
         id: string;
         type: string;
         status: string;
         amount: number;
+        currency: string;
         createdAt: Date;
     }>;
 }
+
+type LoadingState = 'one-time' | 'MONTHLY' | 'YEARLY' | 'cancel' | null;
+
+// ============================================================================
+// PADDLE.JS INITIALIZATION
+// ============================================================================
+
+// Paddle types are declared globally in paddle-checkout-handler.tsx
+
+function usePaddleJs() {
+    const [isLoaded, setIsLoaded] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const router = useRouter();
+
+    useEffect(() => {
+        const clientToken = process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN;
+        const environment = process.env.NEXT_PUBLIC_PADDLE_ENVIRONMENT || 'sandbox';
+
+        if (!clientToken) {
+            console.warn('Paddle client token not configured');
+            return;
+        }
+
+        // Check if already loaded
+        if (window.Paddle) {
+            setIsLoaded(true);
+            return;
+        }
+
+        // Load Paddle.js script
+        const script = document.createElement('script');
+        script.src = 'https://cdn.paddle.com/paddle/v2/paddle.js';
+        script.async = true;
+
+        script.onload = () => {
+            if (window.Paddle) {
+                try {
+                    window.Paddle.Initialize({
+                        token: clientToken,
+                        eventCallback: (event: any) => {
+                            if (!event?.name) return;
+
+                            console.log('🎾 Paddle event:', event.name);
+
+                            switch (event.name) {
+                                case 'checkout.completed':
+                                    toast.success('Payment successful! Updating your account...');
+                                    // Wait for webhook to process, then redirect
+                                    setTimeout(() => {
+                                        window.location.href = '/dashboard/billing?success=true';
+                                    }, 3000);
+                                    break;
+
+                                case 'checkout.closed':
+                                    console.log('Checkout closed by user');
+                                    break;
+
+                                case 'checkout.error':
+                                    console.error('Checkout error:', event);
+                                    const errorMsg = event.data?.error?.detail || 'Checkout failed';
+                                    toast.error(errorMsg);
+                                    break;
+
+                                case 'checkout.loaded':
+                                    console.log('Checkout loaded');
+                                    break;
+                            }
+                        }
+                    });
+
+                    // Set environment
+                    if (environment === 'sandbox') {
+                        window.Paddle.Environment.set('sandbox');
+                    }
+
+                    setIsLoaded(true);
+                    console.log(`✅ Paddle.js initialized (${environment})`);
+                } catch (err: any) {
+                    console.error('Failed to initialize Paddle:', err);
+                    setError(err.message);
+                }
+            }
+        };
+
+        script.onerror = () => {
+            setError('Failed to load payment system');
+            console.error('Failed to load Paddle.js');
+        };
+
+        document.body.appendChild(script);
+
+        return () => {
+            // Cleanup not needed - Paddle should persist
+        };
+    }, [router]);
+
+    return { isLoaded, error };
+}
+
+// ============================================================================
+// SUCCESS BANNER COMPONENT
+// ============================================================================
+
+function SuccessBanner({ type, plan }: { type: string; plan?: string }) {
+    const getMessage = () => {
+        if (type === 'subscription') {
+            return `🎉 Welcome to Pro${plan ? ` (${plan})` : ''}! Your subscription is now active.`;
+        }
+        if (type === 'exam') {
+            return '🎉 Exam credit purchased! You can now publish another exam.';
+        }
+        return '🎉 Payment successful!';
+    };
+
+    return (
+        <div className="mb-6 p-4 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg flex items-center gap-3">
+            <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 shrink-0" />
+            <div>
+                <p className="font-medium text-green-800 dark:text-green-200">{getMessage()}</p>
+                <p className="text-sm text-green-600 dark:text-green-400">
+                    Your account has been updated. Thank you for your purchase!
+                </p>
+            </div>
+        </div>
+    );
+}
+
+// ============================================================================
+// CANCEL BANNER COMPONENT
+// ============================================================================
+
+function CancelBanner() {
+    return (
+        <div className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-lg flex items-center gap-3">
+            <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 shrink-0" />
+            <div>
+                <p className="font-medium text-yellow-800 dark:text-yellow-200">Payment cancelled</p>
+                <p className="text-sm text-yellow-600 dark:text-yellow-400">
+                    No worries! You can try again whenever you're ready.
+                </p>
+            </div>
+        </div>
+    );
+}
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
 
 export function BillingClient({
     isPro,
     freeExamsRemaining,
     oneTimeExamsRemaining,
+    subscription,
     payments
 }: BillingClientProps) {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [isPending, startTransition] = useTransition();
-    const [loadingAction, setLoadingAction] = useState<string | null>(null);
-    const [paddleLoaded, setPaddleLoaded] = useState(false);
+    const [loadingState, setLoadingState] = useState<LoadingState>(null);
+    const { isLoaded: paddleLoaded, error: paddleError } = usePaddleJs();
 
+    // Check for success/cancel URL params
+    const isSuccess = searchParams.get('success') === 'true';
+    const isCancelled = searchParams.get('cancelled') === 'true';
+    const purchaseType = searchParams.get('type');
+    const planType = searchParams.get('plan');
+
+    // Clear URL params after showing banner
     useEffect(() => {
-        // Load Paddle.js script
-        const environment = process.env.NEXT_PUBLIC_PADDLE_ENVIRONMENT;
-        const clientToken = process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN;
-
-        // Check if Paddle is configured
-        if (!environment || !clientToken) {
-            console.error('Paddle configuration missing. Please set NEXT_PUBLIC_PADDLE_ENVIRONMENT and NEXT_PUBLIC_PADDLE_CLIENT_TOKEN');
-            toast.error('Payment system not configured. Please contact support.');
-            return;
+        if (isSuccess || isCancelled) {
+            const timer = setTimeout(() => {
+                router.replace('/dashboard/billing', { scroll: false });
+            }, 10000); // Clear after 10 seconds
+            return () => clearTimeout(timer);
         }
+    }, [isSuccess, isCancelled, router]);
 
-        if (!window.Paddle) {
-            const script = document.createElement('script');
-            script.src = 'https://cdn.paddle.com/paddle/v2/paddle.js';
-            script.async = true;
-            script.onload = () => {
-                if (window.Paddle) {
-                    try {
-                        window.Paddle.Initialize({
-                            token: clientToken,
-                            eventCallback: (event: any) => {
-                                // Guard against undefined events
-                                if (!event || !event.name) {
-                                    console.warn('Received undefined or invalid Paddle event:', event);
-                                    return;
-                                }
-                                
-                                console.log('Paddle event:', event.name, event);
-                                
-                                if (event.name === 'checkout.completed') {
-                                    toast.success('Payment successful! Refreshing...');
-                                    setTimeout(() => router.refresh(), 2000);
-                                } else if (event.name === 'checkout.error') {
-                                    console.error('=== PADDLE CHECKOUT ERROR ===');
-                                    console.error('Event object:', event);
-                                    console.error('Event.name:', event.name);
-                                    console.error('Event.data:', event.data);
-                                    console.error('Event.error:', event.error);
-                                    
-                                    // Try to serialize the full event
-                                    try {
-                                        console.error('Full event JSON:', JSON.stringify(event, null, 2));
-                                    } catch (e) {
-                                        console.error('Cannot serialize event:', e);
-                                        // Try to log all properties
-                                        console.error('Event keys:', Object.keys(event));
-                                        for (const key in event) {
-                                            console.error(`  ${key}:`, event[key]);
-                                        }
-                                    }
-                                    
-                                    const errorMessage = event.data?.error?.detail 
-                                        || event.data?.error?.message 
-                                        || event.data?.error
-                                        || event.error?.detail 
-                                        || event.error?.message
-                                        || event.error
-                                        || event.detail
-                                        || event.message
-                                        || 'Unknown checkout error - check console for details';
-                                    
-                                    toast.error(`Checkout failed: ${errorMessage}`);
-                                } else if (event.name === 'checkout.closed') {
-                                    console.log('Checkout closed by user');
-                                } else if (event.name === 'checkout.loaded') {
-                                    console.log('Checkout loaded successfully');
-                                }
-                            }
-                        });
-                        setPaddleLoaded(true);
-                        console.log(`Paddle initialized successfully in ${environment} mode`);
-                        console.log('Paddle client token:', clientToken.substring(0, 10) + '...');
-                        // Check for transaction parameter in URL and open checkout
-                        const urlParams = new URLSearchParams(window.location.search);
-                        const transactionId = urlParams.get('_ptxn');
-                        if (transactionId) {
-                            console.log('🎯 Transaction parameter detected:', transactionId);
-                            console.log('Opening Paddle checkout automatically...');
-                            
-                            // Small delay to ensure Paddle is fully initialized
-                            setTimeout(() => {
-                                try {
-                                    window.Paddle.Checkout.open({
-                                        transactionId: transactionId
-                                    });
-                                    console.log('✅ Paddle checkout opened with transaction:', transactionId);
-                                } catch (error) {
-                                    console.error('❌ Failed to open Paddle checkout:', error);
-                                    toast.error('Failed to open checkout. Please try again.');
-                                }
-                            }, 500);
-                        }                    } catch (error: any) {
-                        console.error('Failed to initialize Paddle:', error);
-                        console.error('Error message:', error.message);
-                        console.error('Error stack:', error.stack);
-                        toast.error('Failed to initialize payment system');
-                    }
-                }
-            };
-            script.onerror = () => {
-                console.error('Failed to load Paddle.js script');
-                toast.error('Failed to load payment system');
-            };
-            document.body.appendChild(script);
-        } else if (window.Paddle) {
-            setPaddleLoaded(true);
-        }
-    }, [router]);
-
-    const handlePurchaseOneTime = () => {
-        setLoadingAction('one-time');
+    // Handle one-time exam purchase
+    const handlePurchaseOneTime = useCallback(() => {
+        setLoadingState('one-time');
         startTransition(async () => {
             try {
                 const result = await purchaseOneTimeExamAction();
-                console.log('Purchase one-time result:', result);
-                
+
                 if (result.error) {
-                    console.error('Server error:', result.error);
                     toast.error(result.error);
-                    setLoadingAction(null);
+                    setLoadingState(null);
+                    return;
+                }
+
+                // Use Paddle.js overlay checkout with transaction ID
+                if (result.transactionId && window.Paddle) {
+                    toast.info('Opening secure checkout...');
+                    window.Paddle.Checkout.open({
+                        transactionId: result.transactionId,
+                    });
+                    setLoadingState(null);
                 } else if (result.checkoutUrl) {
-                    // Redirect to Paddle checkout page
-                    toast.info('Redirecting to checkout...');
+                    // Fallback to redirect if Paddle.js not loaded
+                    toast.info('Redirecting to secure checkout...');
                     window.location.href = result.checkoutUrl;
                 } else {
-                    console.error('Unexpected result structure:', result);
-                    toast.error('Invalid checkout response');
-                    setLoadingAction(null);
+                    toast.error('Unable to create checkout');
+                    setLoadingState(null);
                 }
             } catch (error: any) {
-                console.error('Action error:', error);
-                toast.error(`Error: ${error.message || 'Something went wrong'}`);
-                setLoadingAction(null);
+                toast.error(error.message || 'Something went wrong');
+                setLoadingState(null);
             }
         });
-    };
+    }, []);
 
-    const handleUpgradePro = (plan: 'MONTHLY' | 'YEARLY') => {
-        setLoadingAction(plan);
+    // Handle Pro subscription upgrade
+    const handleUpgradePro = useCallback((plan: 'MONTHLY' | 'YEARLY') => {
+        setLoadingState(plan);
         startTransition(async () => {
             try {
                 const result = await createProSubscriptionAction(plan);
-                console.log('Create Pro subscription result:', result);
-                
+
                 if (result.error) {
-                    console.error('Server error:', result.error);
                     toast.error(result.error);
-                    setLoadingAction(null);
+                    setLoadingState(null);
+                    return;
+                }
+
+                // Use Paddle.js overlay checkout with transaction ID
+                if (result.transactionId && window.Paddle) {
+                    toast.info('Opening secure checkout...');
+                    window.Paddle.Checkout.open({
+                        transactionId: result.transactionId,
+                    });
+                    setLoadingState(null);
                 } else if (result.checkoutUrl) {
-                    // Redirect to Paddle checkout page
-                    toast.info('Redirecting to checkout...');
+                    // Fallback to redirect if Paddle.js not loaded
+                    toast.info('Redirecting to secure checkout...');
                     window.location.href = result.checkoutUrl;
                 } else {
-                    console.error('Unexpected result structure:', result);
-                    toast.error('Invalid checkout response');
-                    setLoadingAction(null);
+                    toast.error('Unable to create checkout');
+                    setLoadingState(null);
                 }
             } catch (error: any) {
-                console.error('Action error:', error);
-                toast.error(`Error: ${error.message || 'Something went wrong'}`);
-                setLoadingAction(null);
+                toast.error(error.message || 'Something went wrong');
+                setLoadingState(null);
             }
+        });
+    }, []);
+
+    // Handle subscription cancellation
+    const handleCancelSubscription = useCallback(() => {
+        if (!subscription?.id) return;
+
+        if (!confirm('Are you sure you want to cancel your subscription? You will retain Pro access until the end of your billing period.')) {
+            return;
+        }
+
+        setLoadingState('cancel');
+        startTransition(async () => {
+            try {
+                const result = await cancelSubscriptionAction(subscription.id);
+
+                if (result.error) {
+                    toast.error(result.error);
+                } else {
+                    toast.success(result.message || 'Subscription cancelled');
+                    router.refresh();
+                }
+            } catch (error: any) {
+                toast.error(error.message || 'Failed to cancel subscription');
+            } finally {
+                setLoadingState(null);
+            }
+        });
+    }, [subscription?.id, router]);
+
+    // Format currency
+    const formatAmount = (amount: number, currency: string = 'USD') => {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency,
+        }).format(amount / 100);
+    };
+
+    // Format date
+    const formatDate = (date: Date | string) => {
+        return new Date(date).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
         });
     };
 
     return (
         <div className="flex-1 space-y-4 p-4 pt-6">
+            {/* Success/Cancel Banners */}
+            {isSuccess && <SuccessBanner type={purchaseType || 'payment'} plan={planType || undefined} />}
+            {isCancelled && <CancelBanner />}
+
+            {/* Paddle Error Banner */}
+            {paddleError && (
+                <div className="mb-6 p-4 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-3">
+                    <XCircle className="h-5 w-5 text-red-600 dark:text-red-400 shrink-0" />
+                    <p className="text-red-800 dark:text-red-200">
+                        Payment system unavailable. Please refresh the page or try again later.
+                    </p>
+                </div>
+            )}
+
+            {/* Header */}
             <div className="text-center space-y-2 mb-8">
                 <h2 className="text-3xl font-bold tracking-tight">Choose Your Plan</h2>
                 <p className="text-muted-foreground">Simple, transparent pricing. No hidden fees.</p>
             </div>
 
-            {/* Three-Tier Pricing Cards */}
+            {/* Active Subscription Notice */}
+            {isPro && subscription && (
+                <div className="max-w-6xl mx-auto mb-6">
+                    <Card className="border-primary bg-primary/5">
+                        <CardContent className="pt-6">
+                            <div className="flex items-center justify-between flex-wrap gap-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                                        <Sparkles className="h-5 w-5 text-primary" />
+                                    </div>
+                                    <div>
+                                        <p className="font-semibold">Pro {subscription.plan} Plan</p>
+                                        <p className="text-sm text-muted-foreground">
+                                            {subscription.cancelAtPeriodEnd 
+                                                ? `Cancels on ${formatDate(subscription.currentPeriodEnd)}`
+                                                : `Renews on ${formatDate(subscription.currentPeriodEnd)}`
+                                            }
+                                        </p>
+                                    </div>
+                                </div>
+                                {!subscription.cancelAtPeriodEnd && (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleCancelSubscription}
+                                        disabled={loadingState === 'cancel'}
+                                    >
+                                        {loadingState === 'cancel' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                        Cancel Subscription
+                                    </Button>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+
+            {/* Pricing Cards */}
             <div className="grid gap-6 md:grid-cols-3 max-w-6xl mx-auto">
                 {/* FREE PLAN */}
                 <Card className="flex flex-col">
@@ -227,22 +398,24 @@ export function BillingClient({
                         </div>
                         <ul className="space-y-2 text-sm">
                             <li className="flex items-start gap-2">
-                                <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" /> 
+                                <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
                                 <span>3 lifetime exams</span>
                             </li>
                             <li className="flex items-start gap-2">
-                                <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" /> 
+                                <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
                                 <span>Basic exam features</span>
                             </li>
                             <li className="flex items-start gap-2">
-                                <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" /> 
+                                <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
                                 <span>20 question bank items</span>
                             </li>
-                            <li className="flex items-start gap-2 opacity-50">
-                                <span className="text-xs">❌ No integrity tracking</span>
+                            <li className="flex items-start gap-2 text-muted-foreground">
+                                <XCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                                <span>No integrity tracking</span>
                             </li>
-                            <li className="flex items-start gap-2 opacity-50">
-                                <span className="text-xs">❌ No anti-cheat</span>
+                            <li className="flex items-start gap-2 text-muted-foreground">
+                                <XCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                                <span>No anti-cheat</span>
                             </li>
                         </ul>
                         <div className="pt-4 border-t">
@@ -253,13 +426,15 @@ export function BillingClient({
                         </div>
                     </CardContent>
                     <CardFooter>
-                        <Button variant="outline" className="w-full" disabled>Current Plan</Button>
+                        <Button variant="outline" className="w-full" disabled>
+                            {isPro ? 'Included' : 'Current Plan'}
+                        </Button>
                     </CardFooter>
                 </Card>
 
                 {/* PRO PLAN */}
                 <Card className="flex flex-col border-primary shadow-lg relative overflow-hidden">
-                    <div className="absolute top-0 right-0 bg-linear-to-l from-primary to-primary/80 text-primary-foreground text-xs px-3 py-1 rounded-bl-lg font-medium flex items-center gap-1">
+                    <div className="absolute top-0 right-0 bg-gradient-to-l from-primary to-primary/80 text-primary-foreground text-xs px-3 py-1 rounded-bl-lg font-medium flex items-center gap-1">
                         <Sparkles className="h-3 w-3" />
                         {isPro ? "Active" : "Most Popular"}
                     </div>
@@ -277,62 +452,60 @@ export function BillingClient({
                                 <div className="text-sm text-muted-foreground">per month</div>
                             </div>
                             <div className="text-sm bg-muted p-2 rounded">
-                                <strong>$99/year</strong> <span className="text-xs text-muted-foreground">(Save $44.88)</span>
+                                <strong>$99/year</strong>{" "}
+                                <span className="text-xs text-muted-foreground">(Save $44.88)</span>
                             </div>
                         </div>
                         <ul className="space-y-2 text-sm">
                             <li className="flex items-start gap-2">
-                                <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" /> 
+                                <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
                                 <span><strong>Unlimited exams</strong></span>
                             </li>
                             <li className="flex items-start gap-2">
-                                <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" /> 
+                                <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
                                 <span>Full integrity tracking</span>
                             </li>
                             <li className="flex items-start gap-2">
-                                <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" /> 
+                                <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
                                 <span>Anti-cheat features</span>
                             </li>
                             <li className="flex items-start gap-2">
-                                <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" /> 
+                                <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
                                 <span>Unlimited question bank</span>
                             </li>
                             <li className="flex items-start gap-2">
-                                <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" /> 
+                                <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
                                 <span>Advanced analytics</span>
                             </li>
                             <li className="flex items-start gap-2">
-                                <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" /> 
+                                <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
                                 <span>Priority support</span>
                             </li>
                         </ul>
                     </CardContent>
                     <CardFooter className="flex-col gap-2">
                         {isPro ? (
-                            <>
-                                <Button variant="outline" className="w-full" disabled>Current Plan</Button>
-                                <p className="text-xs text-muted-foreground text-center">
-                                    Next billing: {new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString()}
-                                </p>
-                            </>
+                            <Button variant="outline" className="w-full" disabled>
+                                Current Plan
+                            </Button>
                         ) : (
                             <>
-                                <Button 
-                                    className="w-full" 
+                                <Button
+                                    className="w-full"
                                     onClick={() => handleUpgradePro('MONTHLY')}
-                                    disabled={isPending}
+                                    disabled={isPending || !!loadingState}
                                 >
-                                    {loadingAction === 'MONTHLY' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Upgrade to Pro Monthly
+                                    {loadingState === 'MONTHLY' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    Upgrade Monthly - $11.99
                                 </Button>
-                                <Button 
-                                    variant="outline" 
-                                    className="w-full" 
+                                <Button
+                                    variant="outline"
+                                    className="w-full"
                                     onClick={() => handleUpgradePro('YEARLY')}
-                                    disabled={isPending}
+                                    disabled={isPending || !!loadingState}
                                 >
-                                    {loadingAction === 'YEARLY' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Upgrade to Pro Yearly
+                                    {loadingState === 'YEARLY' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    Upgrade Yearly - $99
                                 </Button>
                             </>
                         )}
@@ -352,19 +525,19 @@ export function BillingClient({
                         </div>
                         <ul className="space-y-2 text-sm">
                             <li className="flex items-start gap-2">
-                                <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" /> 
+                                <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
                                 <span>Purchase only when needed</span>
                             </li>
                             <li className="flex items-start gap-2">
-                                <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" /> 
+                                <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
                                 <span>All Pro features included</span>
                             </li>
                             <li className="flex items-start gap-2">
-                                <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" /> 
+                                <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
                                 <span>Full integrity tracking</span>
                             </li>
                             <li className="flex items-start gap-2">
-                                <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" /> 
+                                <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
                                 <span>Never expires</span>
                             </li>
                         </ul>
@@ -376,14 +549,14 @@ export function BillingClient({
                         </div>
                     </CardContent>
                     <CardFooter>
-                        <Button 
-                            variant="secondary" 
-                            className="w-full" 
+                        <Button
+                            variant="secondary"
+                            className="w-full"
                             onClick={handlePurchaseOneTime}
-                            disabled={isPending}
+                            disabled={isPending || !!loadingState}
                         >
-                            {loadingAction === 'one-time' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Buy 1 Exam ($1.99)
+                            {loadingState === 'one-time' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Buy 1 Exam - $1.99
                         </Button>
                     </CardFooter>
                 </Card>
@@ -393,25 +566,65 @@ export function BillingClient({
             <div className="mt-8 rounded-lg border p-4 bg-muted/50 max-w-6xl mx-auto">
                 <h3 className="font-semibold mb-4">Transaction History</h3>
                 {payments.length === 0 ? (
-                    <div className="text-sm text-muted-foreground">No transactions found.</div>
+                    <div className="text-sm text-muted-foreground text-center py-4">
+                        No transactions yet. Your payment history will appear here.
+                    </div>
                 ) : (
                     <div className="space-y-2">
                         {payments.map((payment) => (
-                            <div key={payment.id} className="flex justify-between items-center bg-background p-3 rounded border">
+                            <div
+                                key={payment.id}
+                                className="flex justify-between items-center bg-background p-3 rounded border"
+                            >
                                 <div>
-                                    <div className="font-medium text-sm">{payment.type.replace('_', ' ')}</div>
-                                    <div className="text-xs text-muted-foreground">{new Date(payment.createdAt).toLocaleDateString()}</div>
+                                    <div className="font-medium text-sm">
+                                        {payment.type === 'ONE_TIME_EXAM' && '🎯 One-Time Exam'}
+                                        {payment.type === 'SUBSCRIPTION' && '⭐ Pro Subscription'}
+                                        {payment.type === 'CREDIT_PURCHASE' && '💳 Credit Purchase'}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                        {formatDate(payment.createdAt)}
+                                    </div>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <span className={`text-xs px-2 py-1 rounded-full ${payment.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                    <span
+                                        className={`text-xs px-2 py-1 rounded-full ${
+                                            payment.status === 'COMPLETED'
+                                                ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+                                                : payment.status === 'PENDING'
+                                                ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300'
+                                                : 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
+                                        }`}
+                                    >
                                         {payment.status}
                                     </span>
-                                    <span className="font-bold text-sm">${(payment.amount / 100).toFixed(2)}</span>
+                                    <span className="font-bold text-sm">
+                                        {formatAmount(payment.amount, payment.currency)}
+                                    </span>
                                 </div>
                             </div>
                         ))}
                     </div>
                 )}
+            </div>
+
+            {/* Help Text */}
+            <div className="max-w-6xl mx-auto mt-6 text-center text-sm text-muted-foreground">
+                <p>
+                    Payments are processed securely by{" "}
+                    <a
+                        href="https://paddle.com"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline hover:text-foreground"
+                    >
+                        Paddle
+                    </a>
+                    . Need help?{" "}
+                    <a href="mailto:support@example.com" className="underline hover:text-foreground">
+                        Contact support
+                    </a>
+                </p>
             </div>
         </div>
     );

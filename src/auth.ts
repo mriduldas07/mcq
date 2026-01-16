@@ -127,9 +127,12 @@ export const authConfig = {
     strategy: "jwt",
     maxAge: 7 * 24 * 60 * 60, // 7 days
   },
+  trustHost: true,
   cookies: {
-    pkceCodeVerifier: {
-      name: "next-auth.pkce.code_verifier",
+    sessionToken: {
+      name: process.env.NODE_ENV === "production" 
+        ? "__Secure-authjs.session-token" 
+        : "authjs.session-token",
       options: {
         httpOnly: true,
         sameSite: "lax",
@@ -138,7 +141,6 @@ export const authConfig = {
       },
     },
   },
-  trustHost: true,
 } satisfies NextAuthConfig;
 
 export const { handlers, auth, signIn, signOut } = NextAuth(authConfig);

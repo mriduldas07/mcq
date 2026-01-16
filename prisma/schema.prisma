@@ -21,6 +21,7 @@ model User {
   planType              PlanType @default(FREE)
   freeExamsUsed         Int      @default(0) // Track free exam usage (max 3)
   oneTimeExamsRemaining Int      @default(0) // Purchased one-time exam slots
+  paddleCustomerId      String?  @unique // Paddle customer ID for payment processing
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
@@ -32,6 +33,7 @@ model User {
   subscriptions Subscription[]
 
   @@index([provider, providerAccountId])
+  @@index([paddleCustomerId])
 }
 
 enum PlanType {
@@ -329,4 +331,15 @@ enum IntegrityEventType {
   PASTE_ATTEMPT // User tried to paste
   RIGHT_CLICK // User right-clicked
   CONSOLE_OPENED // DevTools detected (optional)
+}
+
+// Webhook event tracking for idempotency
+model WebhookEvent {
+  id          String   @id @default(cuid())
+  eventId     String   @unique // Paddle event ID
+  eventType   String   // Event type (e.g., transaction.completed)
+  processedAt DateTime @default(now())
+
+  @@index([eventId])
+  @@index([processedAt])
 }

@@ -4,269 +4,352 @@ import { verifySession } from "@/lib/session";
 import { PaymentService } from "@/lib/payment-service";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { paddle, PADDLE_PRICE_IDS } from "@/lib/paddle";
+import { 
+    PADDLE_PRICE_IDS, 
+    getOrCreatePaddleCustomer, 
+    createPaddleCheckout,
+    cancelPaddleSubscription,
+    validatePriceIds,
+    verifyPaddleTransaction,
+} from "@/lib/paddle";
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+interface PaymentResult {
+    success?: boolean;
+    error?: string;
+    checkoutUrl?: string;
+    transactionId?: string;
+    message?: string;
+}
+
+// ============================================================================
+// ONE-TIME EXAM PURCHASE ($1.99)
+// ============================================================================
 
 /**
- * Initialize Paddle checkout for one-time exam purchase ($1.99)
- * Uses server-side API to create checkout session (no domain restrictions)
+ * Initialize Paddle checkout for one-time exam purchase
+ * Creates a transaction and returns a checkout URL
  */
-export async function purchaseOneTimeExamAction() {
-    const session = await verifySession();
-    if (!session) return { error: "Unauthorized" };
-
+export async function purchaseOneTimeExamAction(): Promise<PaymentResult> {
     try {
+        // 1. Verify user session
+        const session = await verifySession();
+        if (!session) {
+            return { error: "Please log in to continue" };
+        }
+
+        // 2. Validate Paddle configuration
+        const priceValidation = validatePriceIds();
+        if (!priceValidation.valid) {
+            console.error('Missing Paddle price IDs:', priceValidation.missing);
+            return { error: "Payment system not fully configured. Please contact support." };
+        }
+
+        // 3. Get user details
         const user = await prisma.user.findUnique({
             where: { id: session.userId },
-            select: { email: true, name: true }
-        });
-
-        if (!user || !user.email) return { error: "User not found or email missing" };
-
-        if (!paddle) {
-            return { error: "Payment system not configured" };
-        }
-
-        // Step 1: Create or get customer in Paddle
-        let paddleCustomerId: string;
-        
-        try {
-            // Try to create new customer
-            const newCustomer = await paddle.customers.create({
-                email: user.email,
-                name: user.name || undefined
-            });
-            paddleCustomerId = newCustomer.id;
-            console.log('Created new Paddle customer:', paddleCustomerId);
-        } catch (customerError: any) {
-            // If customer already exists, extract ID from error message
-            if (customerError.code === 'customer_already_exists' && customerError.detail) {
-                const match = customerError.detail.match(/ctm_[a-z0-9]+/);
-                if (match) {
-                    paddleCustomerId = match[0];
-                    console.log('Using existing Paddle customer:', paddleCustomerId);
-                } else {
-                    console.error('Could not extract customer ID from error:', customerError);
-                    return { error: "Failed to setup customer account" };
-                }
-            } else {
-                console.error('Customer creation failed:', customerError);
-                return { error: "Failed to setup customer account" };
+            select: { 
+                id: true,
+                email: true, 
+                name: true,
+                paddleCustomerId: true,
             }
-        }
-
-        // Step 2: Create Paddle checkout directly using API
-        const paddleApiUrl = process.env.PADDLE_ENVIRONMENT === 'production' 
-            ? 'https://api.paddle.com' 
-            : 'https://sandbox-api.paddle.com';
-
-        const checkoutResponse = await fetch(`${paddleApiUrl}/checkouts`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${process.env.PADDLE_API_KEY}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                items: [{ price_id: PADDLE_PRICE_IDS.ONE_TIME_EXAM, quantity: 1 }],
-                customer_id: paddleCustomerId,
-                custom_data: {
-                    userId: session.userId,
-                    email: user.email
-                }
-            })
         });
 
-        if (!checkoutResponse.ok) {
-            const errorData = await checkoutResponse.text();
-            console.error('Paddle checkout creation failed:', errorData);
-            return { error: "Failed to create checkout session" };
+        if (!user?.email) {
+            return { error: "User account not found or email missing" };
         }
 
-        const checkoutData = await checkoutResponse.json();
-        console.log('Paddle checkout created:', JSON.stringify(checkoutData, null, 2));
-
-        // Paddle returns checkout URL in data.url
-        const checkoutUrl = checkoutData.data?.url;
+        // 4. Get or create Paddle customer
+        let paddleCustomerId = user.paddleCustomerId;
         
-        if (!checkoutUrl) {
-            console.error('No checkout URL in response:', checkoutData);
-            return { error: "Failed to get checkout URL" };
+        if (!paddleCustomerId) {
+            const customerResult = await getOrCreatePaddleCustomer(user.email, user.name || undefined);
+            
+            if (!customerResult.success || !customerResult.customerId) {
+                console.error('Failed to create Paddle customer:', customerResult.error);
+                return { error: "Unable to set up payment. Please try again." };
+            }
+            
+            paddleCustomerId = customerResult.customerId;
+            
+            // Store Paddle customer ID for future use
+            await prisma.user.update({
+                where: { id: user.id },
+                data: { paddleCustomerId },
+            });
         }
 
-        console.log('Paddle checkout URL:', checkoutUrl);
+        // 5. Create checkout session
+        const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
         
-        // Return the checkout URL from Paddle
+        const checkoutResult = await createPaddleCheckout({
+            customerId: paddleCustomerId,
+            priceId: PADDLE_PRICE_IDS.ONE_TIME_EXAM,
+            quantity: 1,
+            customData: {
+                userId: user.id,
+                userEmail: user.email,
+                purchaseType: 'ONE_TIME_EXAM',
+                timestamp: new Date().toISOString(),
+            },
+            successUrl: `${baseUrl}/dashboard/billing?success=true&type=exam`,
+        });
+
+        if (!checkoutResult.success || !checkoutResult.checkoutUrl) {
+            console.error('Failed to create checkout:', checkoutResult.error);
+            return { error: checkoutResult.error || "Unable to create checkout. Please try again." };
+        }
+
+        console.log(`✅ Created one-time exam checkout for user ${user.id}`);
+        
         return { 
             success: true, 
-            checkoutUrl,
-            useServerCheckout: true
+            checkoutUrl: checkoutResult.checkoutUrl,
+            transactionId: checkoutResult.transactionId,
         };
-    } catch (e: any) {
-        console.error("Purchase one-time exam failed", e);
-        return { error: e.message || "Failed to create checkout" };
+
+    } catch (error: any) {
+        console.error("Purchase one-time exam error:", error);
+        return { error: "An unexpected error occurred. Please try again." };
     }
 }
 
+// ============================================================================
+// PRO SUBSCRIPTION ($11.99/month or $99/year)
+// ============================================================================
+
 /**
- * Initialize Paddle checkout for Pro subscription (Monthly or Yearly)
- * Uses server-side API to create checkout session (no domain restrictions)
+ * Initialize Paddle checkout for Pro subscription
+ * Creates a subscription checkout and returns URL
  */
 export async function createProSubscriptionAction(
     plan: 'MONTHLY' | 'YEARLY'
-) {
-    const session = await verifySession();
-    if (!session) return { error: "Unauthorized" };
-
+): Promise<PaymentResult> {
     try {
+        // 1. Verify user session
+        const session = await verifySession();
+        if (!session) {
+            return { error: "Please log in to continue" };
+        }
+
+        // 2. Validate plan parameter
+        if (plan !== 'MONTHLY' && plan !== 'YEARLY') {
+            return { error: "Invalid plan selected" };
+        }
+
+        // 3. Validate Paddle configuration
+        const priceValidation = validatePriceIds();
+        if (!priceValidation.valid) {
+            console.error('Missing Paddle price IDs:', priceValidation.missing);
+            return { error: "Payment system not fully configured. Please contact support." };
+        }
+
+        // 4. Get user details
         const user = await prisma.user.findUnique({
             where: { id: session.userId },
-            select: { email: true, name: true }
+            select: { 
+                id: true,
+                email: true, 
+                name: true,
+                paddleCustomerId: true,
+            }
         });
 
-        if (!user || !user.email) return { error: "User not found or email missing" };
+        if (!user?.email) {
+            return { error: "User account not found or email missing" };
+        }
 
-        // Check if user already has an active subscription
+        // 5. Check if user already has an active subscription
         const hasActiveSub = await PaymentService.hasActiveProSubscription(session.userId);
         if (hasActiveSub) {
             return { error: "You already have an active Pro subscription" };
         }
 
+        // 6. Get or create Paddle customer
+        let paddleCustomerId = user.paddleCustomerId;
+        
+        if (!paddleCustomerId) {
+            const customerResult = await getOrCreatePaddleCustomer(user.email, user.name || undefined);
+            
+            if (!customerResult.success || !customerResult.customerId) {
+                console.error('Failed to create Paddle customer:', customerResult.error);
+                return { error: "Unable to set up payment. Please try again." };
+            }
+            
+            paddleCustomerId = customerResult.customerId;
+            
+            // Store Paddle customer ID
+            await prisma.user.update({
+                where: { id: user.id },
+                data: { paddleCustomerId },
+            });
+        }
+
+        // 7. Create checkout session
         const priceId = plan === 'MONTHLY' 
             ? PADDLE_PRICE_IDS.PRO_MONTHLY 
             : PADDLE_PRICE_IDS.PRO_YEARLY;
-
-        if (!paddle) {
-            return { error: "Payment system not configured" };
-        }
-
-        // Step 1: Create or get customer in Paddle
-        let paddleCustomerId: string;
+            
+        const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
         
-        try {
-            // Try to create new customer
-            const newCustomer = await paddle.customers.create({
-                email: user.email,
-                name: user.name || undefined
-            });
-            paddleCustomerId = newCustomer.id;
-            console.log('Created new Paddle customer:', paddleCustomerId);
-        } catch (customerError: any) {
-            // If customer already exists, extract ID from error message
-            if (customerError.code === 'customer_already_exists' && customerError.detail) {
-                const match = customerError.detail.match(/ctm_[a-z0-9]+/);
-                if (match) {
-                    paddleCustomerId = match[0];
-                    console.log('Using existing Paddle customer:', paddleCustomerId);
-                } else {
-                    console.error('Could not extract customer ID from error:', customerError);
-                    return { error: "Failed to setup customer account" };
-                }
-            } else {
-                console.error('Customer creation failed:', customerError);
-                return { error: "Failed to setup customer account" };
-            }
-        }
-
-        // Step 2: Create Paddle checkout directly using API
-        const paddleApiUrl = process.env.PADDLE_ENVIRONMENT === 'production' 
-            ? 'https://api.paddle.com' 
-            : 'https://sandbox-api.paddle.com';
-
-        const checkoutResponse = await fetch(`${paddleApiUrl}/checkouts`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${process.env.PADDLE_API_KEY}`,
-                'Content-Type': 'application/json',
+        const checkoutResult = await createPaddleCheckout({
+            customerId: paddleCustomerId,
+            priceId,
+            quantity: 1,
+            customData: {
+                userId: user.id,
+                userEmail: user.email,
+                purchaseType: 'PRO_SUBSCRIPTION',
+                plan,
+                timestamp: new Date().toISOString(),
             },
-            body: JSON.stringify({
-                items: [{ price_id: priceId, quantity: 1 }],
-                customer_id: paddleCustomerId,
-                custom_data: {
-                    userId: session.userId,
-                    plan,
-                    email: user.email
-                }
-            })
+            successUrl: `${baseUrl}/dashboard/billing?success=true&type=subscription&plan=${plan.toLowerCase()}`,
         });
 
-        if (!checkoutResponse.ok) {
-            const errorData = await checkoutResponse.text();
-            console.error('Paddle checkout creation failed:', errorData);
-            return { error: "Failed to create checkout session" };
+        if (!checkoutResult.success || !checkoutResult.checkoutUrl) {
+            console.error('Failed to create checkout:', checkoutResult.error);
+            return { error: checkoutResult.error || "Unable to create checkout. Please try again." };
         }
 
-        const checkoutData = await checkoutResponse.json();
-        console.log('Paddle checkout created:', JSON.stringify(checkoutData, null, 2));
-
-        // Paddle returns checkout URL in data.url
-        const checkoutUrl = checkoutData.data?.url;
+        console.log(`✅ Created Pro ${plan} subscription checkout for user ${user.id}`);
         
-        if (!checkoutUrl) {
-            console.error('No checkout URL in response:', checkoutData);
-            return { error: "Failed to get checkout URL" };
-        }
-
-        console.log('Paddle checkout URL:', checkoutUrl);
-
-        // Return the checkout URL
         return { 
             success: true, 
-            checkoutUrl,
-            useServerCheckout: true
+            checkoutUrl: checkoutResult.checkoutUrl,
+            transactionId: checkoutResult.transactionId,
         };
-    } catch (e: any) {
-        console.error("Create Pro subscription failed", e);
-        return { error: e.message || "Failed to create checkout" };
+
+    } catch (error: any) {
+        console.error("Create Pro subscription error:", error);
+        return { error: "An unexpected error occurred. Please try again." };
     }
 }
 
+// ============================================================================
+// CANCEL SUBSCRIPTION
+// ============================================================================
+
 /**
  * Cancel Pro subscription
- * Cancels at end of billing period
+ * Cancels at end of billing period (user keeps access until then)
  */
-export async function cancelSubscriptionAction(subscriptionId: string) {
-    const session = await verifySession();
-    if (!session) return { error: "Unauthorized" };
-
+export async function cancelSubscriptionAction(
+    subscriptionId: string
+): Promise<PaymentResult> {
     try {
-        // Verify subscription belongs to user
+        // 1. Verify user session
+        const session = await verifySession();
+        if (!session) {
+            return { error: "Please log in to continue" };
+        }
+
+        // 2. Verify subscription belongs to user
         const subscription = await prisma.subscription.findUnique({
             where: { id: subscriptionId },
         });
 
-        if (!subscription || subscription.userId !== session.userId) {
+        console.log(`🔍 Cancel request for subscription: ${subscriptionId}`, {
+            found: !!subscription,
+            paddleId: subscription?.paddleSubscriptionId,
+            status: subscription?.status,
+        });
+
+        if (!subscription) {
             return { error: "Subscription not found" };
         }
 
-        if (!subscription.paddleSubscriptionId) {
-            return { error: "Cannot cancel subscription - no Paddle subscription ID" };
+        if (subscription.userId !== session.userId) {
+            return { error: "You don't have permission to cancel this subscription" };
         }
 
-        // Cancel via Paddle API
-        await paddle.subscriptions.cancel(subscription.paddleSubscriptionId, {
-            effectiveFrom: 'next_billing_period' as any // Cancel at end of period
-        });
+        if (subscription.status === 'CANCELLED') {
+            return { error: "Subscription is already cancelled" };
+        }
 
-        // Update local record
+        // If no Paddle subscription ID, just mark as cancelled locally
+        // This can happen if subscription was created before proper Paddle integration
+        if (!subscription.paddleSubscriptionId) {
+            console.warn(`⚠️ Subscription ${subscriptionId} has no paddleSubscriptionId - cancelling locally only`);
+            
+            // Update local record
+            await PaymentService.cancelSubscription(session.userId, subscriptionId);
+            
+            // Revalidate pages
+            revalidatePath("/dashboard");
+            revalidatePath("/dashboard/billing");
+            
+            return { 
+                success: true, 
+                message: "Subscription cancelled successfully." 
+            };
+        }
+
+        // 3. Cancel via Paddle API
+        console.log(`📤 Sending cancel request to Paddle for: ${subscription.paddleSubscriptionId}`);
+        
+        const cancelResult = await cancelPaddleSubscription(
+            subscription.paddleSubscriptionId,
+            'next_billing_period'
+        );
+
+        if (!cancelResult.success) {
+            console.error('❌ Failed to cancel via Paddle:', cancelResult.error);
+            
+            // If Paddle says subscription is already cancelled or not found, still update locally
+            if (cancelResult.error?.includes('not found') || 
+                cancelResult.error?.includes('already') ||
+                cancelResult.error?.includes('canceled')) {
+                console.log('⚠️ Paddle error suggests subscription may already be cancelled - updating local record');
+                await PaymentService.cancelSubscription(session.userId, subscriptionId);
+                revalidatePath("/dashboard");
+                revalidatePath("/dashboard/billing");
+                return { 
+                    success: true, 
+                    message: "Subscription cancelled." 
+                };
+            }
+            
+            return { error: cancelResult.error || "Unable to cancel subscription. Please try again." };
+        }
+
+        // 4. Update local record
         await PaymentService.cancelSubscription(session.userId, subscriptionId);
 
+        // 5. Revalidate pages
         revalidatePath("/dashboard");
         revalidatePath("/dashboard/billing");
         
-        return { success: true, message: "Subscription will be canceled at end of billing period" };
-    } catch (e) {
-        console.error("Cancel subscription failed", e);
-        return { error: "Failed to cancel subscription" };
+        console.log(`✅ Cancelled subscription ${subscriptionId} for user ${session.userId}`);
+        
+        return { 
+            success: true, 
+            message: "Subscription cancelled. You'll retain Pro access until the end of your billing period." 
+        };
+
+    } catch (error: any) {
+        console.error("Cancel subscription error:", error);
+        return { error: "An unexpected error occurred. Please try again." };
     }
 }
+
+// ============================================================================
+// GET SUBSCRIPTION DETAILS
+// ============================================================================
 
 /**
  * Get subscription details for current user
  */
 export async function getSubscriptionDetailsAction() {
-    const session = await verifySession();
-    if (!session) return { error: "Unauthorized" };
-
     try {
+        const session = await verifySession();
+        if (!session) {
+            return { error: "Unauthorized" };
+        }
+
         const subscription = await prisma.subscription.findFirst({
             where: { 
                 userId: session.userId,
@@ -284,52 +367,152 @@ export async function getSubscriptionDetailsAction() {
                 id: subscription.id,
                 plan: subscription.plan,
                 status: subscription.status,
+                currentPeriodStart: subscription.currentPeriodStart,
                 currentPeriodEnd: subscription.currentPeriodEnd,
+                cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
                 cancelledAt: subscription.cancelledAt,
+                amount: subscription.amount,
+                currency: subscription.currency,
             }
         };
-    } catch (e) {
-        console.error("Get subscription details failed", e);
-        return { error: "Failed to fetch subscription" };
+    } catch (error: any) {
+        console.error("Get subscription details error:", error);
+        return { error: "Failed to fetch subscription details" };
     }
 }
+
+// ============================================================================
+// VERIFY PAYMENT SUCCESS (Client-side callback verification)
+// ============================================================================
 
 /**
- * Get customer portal URL for managing subscription
+ * Verify a completed payment transaction
+ * Called after user returns from Paddle checkout
  */
-export async function getCustomerPortalUrlAction() {
-    const session = await verifySession();
-    if (!session) return { error: "Unauthorized" };
-
+export async function verifyPaymentSuccessAction(
+    transactionId: string
+): Promise<{ success: boolean; verified: boolean; error?: string }> {
     try {
-        const subscription = await prisma.subscription.findFirst({
-            where: { 
-                userId: session.userId,
-                status: 'ACTIVE'
-            }
-        });
-
-        if (!subscription?.paddleCustomerId) {
-            return { error: "No active subscription found" };
+        const session = await verifySession();
+        if (!session) {
+            return { success: false, verified: false, error: "Unauthorized" };
         }
 
-        // Generate customer portal URL
-        // Note: Paddle doesn't have a direct API for this yet, 
-        // redirect to billing page
+        // Verify with Paddle API
+        const verifyResult = await verifyPaddleTransaction(transactionId);
+        
+        if (!verifyResult.success) {
+            return { 
+                success: false, 
+                verified: false, 
+                error: verifyResult.error || "Unable to verify transaction" 
+            };
+        }
+
+        // Check if transaction belongs to this user
+        if (verifyResult.customData?.userId !== session.userId) {
+            return { 
+                success: false, 
+                verified: false, 
+                error: "Transaction does not belong to this user" 
+            };
+        }
+
         return {
-            portalUrl: `${process.env.NEXTAUTH_URL}/dashboard/billing`
+            success: true,
+            verified: verifyResult.completed,
         };
-    } catch (e) {
-        console.error("Get portal URL failed", e);
-        return { error: "Failed to generate portal URL" };
+
+    } catch (error: any) {
+        console.error("Verify payment error:", error);
+        return { success: false, verified: false, error: "Verification failed" };
     }
 }
 
-// DEPRECATED - Legacy credit system (keeping for migration)
+// ============================================================================
+// GET USER BILLING STATUS
+// ============================================================================
+
+/**
+ * Get comprehensive billing status for current user
+ */
+export async function getUserBillingStatusAction() {
+    try {
+        const session = await verifySession();
+        if (!session) {
+            return { error: "Unauthorized" };
+        }
+
+        const user = await prisma.user.findUnique({
+            where: { id: session.userId },
+            select: {
+                id: true,
+                planType: true,
+                freeExamsUsed: true,
+                oneTimeExamsRemaining: true,
+                subscriptions: {
+                    where: { status: 'ACTIVE' },
+                    orderBy: { currentPeriodEnd: 'desc' },
+                    take: 1,
+                },
+                payments: {
+                    orderBy: { createdAt: 'desc' },
+                    take: 10,
+                },
+            },
+        });
+
+        if (!user) {
+            return { error: "User not found" };
+        }
+
+        const activeSubscription = user.subscriptions[0] || null;
+        const isPro = activeSubscription && new Date() <= activeSubscription.currentPeriodEnd;
+
+        return {
+            isPro,
+            planType: user.planType,
+            freeExamsRemaining: Math.max(0, 3 - user.freeExamsUsed),
+            oneTimeExamsRemaining: user.oneTimeExamsRemaining,
+            subscription: activeSubscription ? {
+                id: activeSubscription.id,
+                plan: activeSubscription.plan,
+                status: activeSubscription.status,
+                currentPeriodEnd: activeSubscription.currentPeriodEnd,
+                cancelAtPeriodEnd: activeSubscription.cancelAtPeriodEnd,
+            } : null,
+            recentPayments: user.payments.map(p => ({
+                id: p.id,
+                type: p.type,
+                status: p.status,
+                amount: p.amount,
+                currency: p.currency,
+                createdAt: p.createdAt,
+            })),
+        };
+
+    } catch (error: any) {
+        console.error("Get billing status error:", error);
+        return { error: "Failed to fetch billing status" };
+    }
+}
+
+// ============================================================================
+// DEPRECATED ACTIONS (kept for backward compatibility)
+// ============================================================================
+
 export async function buyCreditsAction(formData: FormData) {
     return { error: "Credit system has been deprecated. Please use the new pricing model." };
 }
 
 export async function upgradeSubscriptionAction(formData: FormData) {
     return { error: "Please use createProSubscriptionAction instead." };
+}
+
+export async function getCustomerPortalUrlAction() {
+    // Paddle doesn't have a self-service customer portal like Stripe
+    // Redirect to our billing page instead
+    return {
+        portalUrl: `${process.env.NEXTAUTH_URL || ''}/dashboard/billing`
+    };
 }

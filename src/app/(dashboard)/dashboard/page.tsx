@@ -21,6 +21,10 @@ import {
 } from "lucide-react";
 import { Prisma } from "@prisma/client";
 
+// Disable static rendering, enable dynamic with revalidation
+export const dynamic = "force-dynamic";
+export const revalidate = 30; // Revalidate every 30 seconds
+
 type RecentAttempt = Prisma.StudentAttemptGetPayload<{
     include: {
         exam: {
@@ -268,7 +272,7 @@ export default async function DashboardPage() {
                                             </span>
                                         </div>
                                         
-                                        <div className="text-right min-w-[3rem]">
+                                        <div className="text-right min-w-12">
                                             <div className="text-lg font-bold">{attempt.score}%</div>
                                             {attempt.violations > 0 && (
                                                 <div className="sm:hidden text-xs text-destructive font-medium">
