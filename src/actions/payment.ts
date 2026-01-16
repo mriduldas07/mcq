@@ -54,31 +54,44 @@ export async function purchaseOneTimeExamAction() {
             }
         }
 
-        // Step 2: Create transaction with customer_id
-        const checkoutData = {
-            items: [{ priceId: PADDLE_PRICE_IDS.ONE_TIME_EXAM, quantity: 1 }],
-            customerId: paddleCustomerId,
-            customData: {
-                userId: session.userId,
-                email: user.email            },
-            checkout: {
-                url: process.env.NEXTAUTH_URL!            }
-        };
+        // Step 2: Create Paddle checkout directly using API
+        const paddleApiUrl = process.env.PADDLE_ENVIRONMENT === 'production' 
+            ? 'https://api.paddle.com' 
+            : 'https://sandbox-api.paddle.com';
 
-        console.log('Creating Paddle transaction with data:', JSON.stringify(checkoutData, null, 2));
+        const checkoutResponse = await fetch(`${paddleApiUrl}/checkouts`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${process.env.PADDLE_API_KEY}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                items: [{ price_id: PADDLE_PRICE_IDS.ONE_TIME_EXAM, quantity: 1 }],
+                customer_id: paddleCustomerId,
+                custom_data: {
+                    userId: session.userId,
+                    email: user.email
+                }
+            })
+        });
 
-        const transaction = await paddle.transactions.create(checkoutData as any);
-        
-        console.log('Transaction created:', JSON.stringify(transaction, null, 2));
-        console.log('Transaction status:', transaction.status);
+        if (!checkoutResponse.ok) {
+            const errorData = await checkoutResponse.text();
+            console.error('Paddle checkout creation failed:', errorData);
+            return { error: "Failed to create checkout session" };
+        }
 
-        // Get transaction ID to build checkout URL
-        const transactionId = transaction.id;
+        const checkoutData = await checkoutResponse.json();
+        console.log('Paddle checkout created:', JSON.stringify(checkoutData, null, 2));
+
+        // Paddle returns checkout URL in data.url
+        const checkoutUrl = checkoutData.data?.url;
         
-        // Build Paddle's hosted checkout URL
-        const paddleEnvironment = process.env.PADDLE_ENVIRONMENT === 'production' ? 'buy' : 'sandbox-buy';
-        const checkoutUrl = `https://${paddleEnvironment}.paddle.com/checkout?_ptxn=${transactionId}`;
-        
+        if (!checkoutUrl) {
+            console.error('No checkout URL in response:', checkoutData);
+            return { error: "Failed to get checkout URL" };
+        }
+
         console.log('Paddle checkout URL:', checkoutUrl);
         
         // Return the checkout URL from Paddle
@@ -153,34 +166,45 @@ export async function createProSubscriptionAction(
             }
         }
 
-        // Step 2: Create transaction with customer_id
-        const checkoutData = {
-            items: [{ priceId, quantity: 1 }],
-            customerId: paddleCustomerId,
-            customData: {
-                userId: session.userId,
-                plan,
-                email: user.email
+        // Step 2: Create Paddle checkout directly using API
+        const paddleApiUrl = process.env.PADDLE_ENVIRONMENT === 'production' 
+            ? 'https://api.paddle.com' 
+            : 'https://sandbox-api.paddle.com';
+
+        const checkoutResponse = await fetch(`${paddleApiUrl}/checkouts`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${process.env.PADDLE_API_KEY}`,
+                'Content-Type': 'application/json',
             },
-            checkout: {
-                url: process.env.NEXTAUTH_URL!
-            }
-        };
+            body: JSON.stringify({
+                items: [{ price_id: priceId, quantity: 1 }],
+                customer_id: paddleCustomerId,
+                custom_data: {
+                    userId: session.userId,
+                    plan,
+                    email: user.email
+                }
+            })
+        });
 
-        console.log('Creating Paddle transaction with data:', JSON.stringify(checkoutData, null, 2));
+        if (!checkoutResponse.ok) {
+            const errorData = await checkoutResponse.text();
+            console.error('Paddle checkout creation failed:', errorData);
+            return { error: "Failed to create checkout session" };
+        }
 
-        const transaction = await paddle.transactions.create(checkoutData as any);
+        const checkoutData = await checkoutResponse.json();
+        console.log('Paddle checkout created:', JSON.stringify(checkoutData, null, 2));
 
-        console.log('Transaction created:', JSON.stringify(transaction, null, 2));
-        console.log('Transaction status:', transaction.status);
-
-        // Get transaction ID to build checkout URL
-        const transactionId = transaction.id;
+        // Paddle returns checkout URL in data.url
+        const checkoutUrl = checkoutData.data?.url;
         
-        // Build Paddle's hosted checkout URL
-        const paddleEnvironment = process.env.PADDLE_ENVIRONMENT === 'production' ? 'buy' : 'sandbox-buy';
-        const checkoutUrl = `https://${paddleEnvironment}.paddle.com/checkout?_ptxn=${transactionId}`;
-        
+        if (!checkoutUrl) {
+            console.error('No checkout URL in response:', checkoutData);
+            return { error: "Failed to get checkout URL" };
+        }
+
         console.log('Paddle checkout URL:', checkoutUrl);
 
         // Return the checkout URL
