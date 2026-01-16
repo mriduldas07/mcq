@@ -16,7 +16,8 @@ export default async function SettingsPage() {
             email: true,
             image: true,
             planType: true,
-            credits: true,
+            freeExamsUsed: true,
+            oneTimeExamsRemaining: true,
             createdAt: true,
         },
     });

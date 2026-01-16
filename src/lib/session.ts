@@ -7,7 +7,8 @@ export type SessionUser = {
     name: string;
     image: string;
     planType: string;
-    credits: number;
+    freeExamsUsed: number;
+    oneTimeExamsRemaining: number;
 };
 
 /**
@@ -27,7 +28,8 @@ export async function verifySession(): Promise<SessionUser | null> {
         name: session.user.name,
         image: session.user.image,
         planType: session.user.planType,
-        credits: session.user.credits,
+        freeExamsUsed: session.user.freeExamsUsed || 0,
+        oneTimeExamsRemaining: session.user.oneTimeExamsRemaining || 0,
     };
 }
 

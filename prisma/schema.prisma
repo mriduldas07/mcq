@@ -11,24 +11,26 @@ datasource db {
 }
 
 model User {
-  id                String    @id @default(cuid())
-  email             String    @unique
-  passwordHash      String?   // Deprecated - keeping for migration
-  name              String?
-  image             String?   // Profile picture from Google
-  provider          String    @default("google") // OAuth provider
-  providerAccountId String?   // Google account ID
-  planType          PlanType  @default(FREE)
-  credits           Int       @default(0) // For Pay-Per-Exam
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  
+  id                    String   @id @default(cuid())
+  email                 String   @unique
+  passwordHash          String? // Deprecated - keeping for migration
+  name                  String?
+  image                 String? // Profile picture from Google
+  provider              String   @default("google") // OAuth provider
+  providerAccountId     String? // Google account ID
+  planType              PlanType @default(FREE)
+  freeExamsUsed         Int      @default(0) // Track free exam usage (max 3)
+  oneTimeExamsRemaining Int      @default(0) // Purchased one-time exam slots
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
   exams         Exam[]
   payments      Payment[]
   templates     ExamTemplate[]
   questionBank  QuestionBank[]
   folders       QuestionFolder[]
-  
+  subscriptions Subscription[]
+
   @@index([provider, providerAccountId])
 }
 
@@ -38,42 +40,43 @@ enum PlanType {
 }
 
 model Exam {
-  id              String      @id @default(cuid())
-  title           String
-  description     String?
-  duration        Int         // Duration in minutes
-  teacherId       String
-  teacher         User        @relation(fields: [teacherId], references: [id])
-  status          ExamStatus  @default(DRAFT)
-  priceMode       PriceMode   @default(FREE)
-  
-  // Anti-cheat settings
-  antiCheatEnabled Boolean    @default(true)  // Enable/disable anti-cheat
-  maxViolations   Int         @default(3)      // Max violations before auto-submit
-  
-  // Scheduling settings
-  scheduledStartTime DateTime?  // When exam becomes available
-  scheduledEndTime   DateTime?  // When exam closes
-  allowLateSubmission Boolean  @default(false)  // Allow submission after end time
-  
-  // Grading settings
-  passPercentage  Int         @default(50)     // Minimum percentage to pass
-  shuffleQuestions Boolean    @default(false)  // Randomize question order
-  shuffleOptions   Boolean    @default(false)  // Randomize option order
-  showResultsImmediately Boolean @default(true) // Show results after submission
-  negativeMarking Boolean     @default(false)  // Enable negative marking
-  negativeMarks   Float       @default(0)      // Marks to deduct per wrong answer (e.g., 0.25)
-  
-  // Access control
-  requirePassword Boolean     @default(false)  // Require password to access
-  examPassword    String?                      // Exam access password
-  maxAttempts     Int?                         // Max attempts per student (null = unlimited)
-  
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  id          String     @id @default(cuid())
+  title       String
+  description String?
+  duration    Int // Duration in minutes
+  teacherId   String
+  teacher     User       @relation(fields: [teacherId], references: [id])
+  status      ExamStatus @default(DRAFT)
+  examMode    ExamMode   @default(FREE) // FREE/PRO/ONE_TIME - determines feature access
+  priceMode   PriceMode  @default(FREE) // Deprecated - keeping for migration
 
-  questions   Question[]
-  attempts    StudentAttempt[]
+  // Anti-cheat settings
+  antiCheatEnabled Boolean @default(true) // Enable/disable anti-cheat
+  maxViolations    Int     @default(3) // Max violations before auto-submit
+
+  // Scheduling settings
+  scheduledStartTime  DateTime? // When exam becomes available
+  scheduledEndTime    DateTime? // When exam closes
+  allowLateSubmission Boolean   @default(false) // Allow submission after end time
+
+  // Grading settings
+  passPercentage         Int     @default(50) // Minimum percentage to pass
+  shuffleQuestions       Boolean @default(false) // Randomize question order
+  shuffleOptions         Boolean @default(false) // Randomize option order
+  showResultsImmediately Boolean @default(true) // Show results after submission
+  negativeMarking        Boolean @default(false) // Enable negative marking
+  negativeMarks          Float   @default(0) // Marks to deduct per wrong answer (e.g., 0.25)
+
+  // Access control
+  requirePassword Boolean @default(false) // Require password to access
+  examPassword    String? // Exam access password
+  maxAttempts     Int? // Max attempts per student (null = unlimited)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  questions Question[]
+  attempts  StudentAttempt[]
 }
 
 enum ExamStatus {
@@ -82,53 +85,67 @@ enum ExamStatus {
   ENDED
 }
 
+enum ExamMode {
+  FREE // Limited features (basic scoring only)
+  PRO // Full features (analytics, integrity, exports)
+  ONE_TIME // Full features for single exam
+}
+
 enum PriceMode {
   FREE
-  PAID_BY_TEACHER // Teacher pays, student free
+  PAID_BY_TEACHER // Teacher pays, student free - DEPRECATED
 }
 
 model Question {
   id            String   @id @default(cuid())
   examId        String
   exam          Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
-  text          String   // Rich text content
-  options       Json     // Array of option objects { id: string, text: string }
-  correctOption String   // ID of the correct option
+  text          String // Rich text content
+  options       Json // Array of option objects { id: string, text: string }
+  correctOption String // ID of the correct option
   marks         Int      @default(1)
-  negativeMarks Float    @default(0)  // Negative marks for wrong answer (overrides exam default)
-  timeLimit     Int?     // Optional per-question timer in seconds
-  explanation   String?  // Optional explanation shown after submission
+  negativeMarks Float    @default(0) // Negative marks for wrong answer (overrides exam default)
+  timeLimit     Int? // Optional per-question timer in seconds
+  explanation   String? // Optional explanation shown after submission
   difficulty    String   @default("MEDIUM") // EASY, MEDIUM, HARD
   createdAt     DateTime @default(now())
 }
 
 model StudentAttempt {
-  id            String    @id @default(cuid())
-  examId        String
-  exam          Exam      @relation(fields: [examId], references: [id], onDelete: Cascade)
-  studentName   String
-  rollNumber    String?
-  startTime     DateTime? // When exam actually started (server time) - set on first fullscreen entry
-  endTime       DateTime? // Calculated deadline (server time) - set on first fullscreen entry
-  startedAt     DateTime? // CRITICAL: Set only when student enters fullscreen for first time (NULL = exam not started)
-  completedAt   DateTime?
-  submitted     Boolean   @default(false)
-  score         Int       @default(0)
-  totalQuestions Int      @default(0)  // Total number of questions
-  correctAnswers Int      @default(0)  // Number of correct answers
-  wrongAnswers   Int      @default(0)  // Number of wrong answers
-  unanswered     Int      @default(0)  // Number of unanswered questions
-  answers       Json      // Stored answers { questionId: optionId }
-  violations    Int       @default(0)  // TASK 6: Track tab switches, window blur, etc.
-  trustScore    Int       @default(100)
-  createdAt     DateTime  @default(now())
+  id             String    @id @default(cuid())
+  examId         String
+  exam           Exam      @relation(fields: [examId], references: [id], onDelete: Cascade)
+  studentName    String
+  rollNumber     String?
+  startTime      DateTime? // When exam actually started (server time) - set on first fullscreen entry
+  endTime        DateTime? // Calculated deadline (server time) - set on first fullscreen entry
+  startedAt      DateTime? // CRITICAL: Set only when student enters fullscreen for first time (NULL = exam not started)
+  completedAt    DateTime?
+  submitted      Boolean   @default(false)
+  score          Int       @default(0)
+  totalQuestions Int       @default(0) // Total number of questions
+  correctAnswers Int       @default(0) // Number of correct answers
+  wrongAnswers   Int       @default(0) // Number of wrong answers
+  unanswered     Int       @default(0) // Number of unanswered questions
+  answers        Json // Stored answers { questionId: optionId }
+
+  // Integrity tracking fields
+  violations      Int    @default(0) // Count of integrity violations
+  trustScore      Int    @default(100) // 0-100 score
+  integrityLevel  String @default("HIGH") // HIGH/MEDIUM/LOW
+  totalAwayTime   Int    @default(0) // Total seconds away from exam
+  questionTimings Json? // { questionId: timeSpentSeconds }
+  answerRevisions Json? // { questionId: revisionCount }
+
+  createdAt       DateTime         @default(now())
+  integrityEvents IntegrityEvent[]
 }
 
 model Payment {
   id        String        @id @default(cuid())
   teacherId String
   teacher   User          @relation(fields: [teacherId], references: [id])
-  amount    Int           // Amount in cents
+  amount    Int // Amount in cents
   currency  String        @default("USD")
   status    PaymentStatus @default(PENDING)
   type      PaymentType
@@ -142,76 +159,77 @@ enum PaymentStatus {
 }
 
 enum PaymentType {
-  SUBSCRIPTION
-  CREDIT_PURCHASE
+  SUBSCRIPTION // Pro plan subscription
+  ONE_TIME_EXAM // Single exam purchase
+  CREDIT_PURCHASE // DEPRECATED - legacy credit system
 }
 
 model ExamTemplate {
-  id              String   @id @default(cuid())
-  name            String
-  description     String?
-  teacherId       String
-  teacher         User     @relation(fields: [teacherId], references: [id])
-  
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+  teacherId   String
+  teacher     User    @relation(fields: [teacherId], references: [id])
+
   // Exam configuration to be copied
-  duration        Int      // Duration in minutes
-  antiCheatEnabled Boolean @default(true)
-  maxViolations   Int      @default(3)
-  passPercentage  Int      @default(50)
-  shuffleQuestions Boolean @default(false)
-  shuffleOptions   Boolean @default(false)
+  duration               Int // Duration in minutes
+  antiCheatEnabled       Boolean @default(true)
+  maxViolations          Int     @default(3)
+  passPercentage         Int     @default(50)
+  shuffleQuestions       Boolean @default(false)
+  shuffleOptions         Boolean @default(false)
   showResultsImmediately Boolean @default(true)
-  negativeMarking Boolean  @default(false)
-  negativeMarks   Float    @default(0)
-  requirePassword Boolean  @default(false)
-  maxAttempts     Int?
-  allowLateSubmission Boolean @default(false)
-  
+  negativeMarking        Boolean @default(false)
+  negativeMarks          Float   @default(0)
+  requirePassword        Boolean @default(false)
+  maxAttempts            Int?
+  allowLateSubmission    Boolean @default(false)
+
   // Template marketplace fields
-  category        String?  // academic, certification, practice, assessment
-  isPublic        Boolean  @default(false)  // Public templates visible to all
-  isFeatured      Boolean  @default(false)  // Featured in marketplace
-  usageCount      Int      @default(0)      // Track popularity
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
+  category   String? // academic, certification, practice, assessment
+  isPublic   Boolean @default(false) // Public templates visible to all
+  isFeatured Boolean @default(false) // Featured in marketplace
+  usageCount Int     @default(0) // Track popularity
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([isPublic, isFeatured])
   @@index([category])
 }
 
 model QuestionBank {
-  id            String   @id @default(cuid())
-  teacherId     String
-  teacher       User     @relation(fields: [teacherId], references: [id])
-  
+  id        String @id @default(cuid())
+  teacherId String
+  teacher   User   @relation(fields: [teacherId], references: [id])
+
   // Folder organization (NEW)
-  folderId      String?
-  folder        QuestionFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
-  
+  folderId String?
+  folder   QuestionFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+
   // Question content (COPY from exam, never reference)
-  text          String   // Keep old name for now, will migrate later
-  options       Json     // Array of option objects { id: string, text: string }
-  correctOption String   // ID of the correct option
-  marks         Int      @default(1)
-  negativeMarks Float    @default(0)  // Keep for compatibility
-  timeLimit     Int?     // Keep for compatibility
-  explanation   String?  // Keep for compatibility
-  
+  text          String // Keep old name for now, will migrate later
+  options       Json // Array of option objects { id: string, text: string }
+  correctOption String // ID of the correct option
+  marks         Int     @default(1)
+  negativeMarks Float   @default(0) // Keep for compatibility
+  timeLimit     Int? // Keep for compatibility
+  explanation   String? // Keep for compatibility
+
   // Simple tagging system (MVP)
-  subject       String?  // e.g., "Mathematics", "Physics"
-  topic         String?  // e.g., "Algebra", "Mechanics"
-  difficulty    String   @default("MEDIUM") // EASY, MEDIUM, HARD
-  tags          String[] // Additional tags for filtering
-  
+  subject    String? // e.g., "Mathematics", "Physics"
+  topic      String? // e.g., "Algebra", "Mechanics"
+  difficulty String   @default("MEDIUM") // EASY, MEDIUM, HARD
+  tags       String[] // Additional tags for filtering
+
   // Usage tracking (for analytics later)
-  usageCount    Int      @default(0)  // Keep old name for now
-  lastUsed      DateTime?  // Keep old name for now
-  isPublic      Boolean  @default(false)  // Keep for compatibility
-  
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
+  usageCount Int       @default(0) // Keep old name for now
+  lastUsed   DateTime? // Keep old name for now
+  isPublic   Boolean   @default(false) // Keep for compatibility
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([teacherId])
   @@index([folderId])
   @@index([subject])
@@ -220,25 +238,95 @@ model QuestionBank {
 
 // Folder structure for organizing questions (like Google Drive)
 model QuestionFolder {
-  id            String   @id @default(cuid())
-  name          String
-  color         String?  // Optional color for visual organization
-  icon          String?  // Optional emoji/icon
-  teacherId     String
-  teacher       User     @relation(fields: [teacherId], references: [id], onDelete: Cascade)
-  
+  id        String  @id @default(cuid())
+  name      String
+  color     String? // Optional color for visual organization
+  icon      String? // Optional emoji/icon
+  teacherId String
+  teacher   User    @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
   // Hierarchical structure (nested folders)
-  parentId      String?
-  parent        QuestionFolder?  @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
-  subfolders    QuestionFolder[] @relation("FolderHierarchy")
-  
+  parentId   String?
+  parent     QuestionFolder?  @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  subfolders QuestionFolder[] @relation("FolderHierarchy")
+
   // Questions in this folder
-  questions     QuestionBank[]
-  
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
+  questions QuestionBank[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([teacherId, name, parentId]) // Prevent duplicate folder names in same location
   @@index([teacherId])
   @@index([parentId])
-  @@unique([teacherId, name, parentId]) // Prevent duplicate folder names in same location
+}
+
+// Subscription management for Pro plans
+model Subscription {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  plan   SubscriptionPlan   @default(MONTHLY) // MONTHLY or YEARLY
+  status SubscriptionStatus @default(ACTIVE)
+
+  // Paddle integration fields
+  paddleSubscriptionId String? @unique // Paddle subscription ID
+  paddleCustomerId     String? // Paddle customer ID
+
+  // Billing cycle
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  cancelAtPeriodEnd  Boolean  @default(false)
+
+  // Pricing
+  amount   Int // Amount in cents (1199 or 9900)
+  currency String @default("USD")
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  cancelledAt DateTime?
+
+  @@index([userId, status])
+  @@index([paddleSubscriptionId])
+}
+
+enum SubscriptionPlan {
+  MONTHLY // $11.99/month
+  YEARLY // $99/year
+}
+
+enum SubscriptionStatus {
+  ACTIVE // Currently active and billing
+  EXPIRED // Period ended, not renewed
+  CANCELLED // Manually cancelled by user
+  PAST_DUE // Payment failed
+}
+
+// Integrity event tracking for evidence-based reporting
+model IntegrityEvent {
+  id        String         @id @default(cuid())
+  attemptId String
+  attempt   StudentAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  eventType IntegrityEventType
+  timestamp DateTime           @default(now())
+
+  // Context
+  questionId String? // Which question was active
+  metadata   Json? // Additional data (duration, etc.)
+
+  @@index([attemptId])
+  @@index([eventType])
+}
+
+enum IntegrityEventType {
+  TAB_SWITCH // User switched to another tab
+  FULLSCREEN_EXIT // User exited fullscreen mode
+  FOCUS_LOST // Window lost focus
+  FOCUS_GAINED // Window regained focus
+  COPY_ATTEMPT // User tried to copy text
+  PASTE_ATTEMPT // User tried to paste
+  RIGHT_CLICK // User right-clicked
+  CONSOLE_OPENED // DevTools detected (optional)
 }

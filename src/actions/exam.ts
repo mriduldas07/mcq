@@ -296,27 +296,48 @@ export async function publishExamAction(examId: string, formData: FormData) {
 
         const userId = session.userId;
 
-        // CHECK MONETIZATION
-        // Rule: Deduct credit on publish if not PRO
-
-        try {
-            await PaymentService.deductCredits(userId);
-        } catch (e: any) {
-            return { error: e.message || "Insufficient credits. Please top up." };
+        // NEW PRICING MODEL: Check if user can publish and determine exam mode
+        const publishCheck = await PaymentService.canPublishExam(userId);
+        
+        if (!publishCheck.canPublish) {
+            return { 
+                error: publishCheck.reason || "Cannot publish exam",
+                needsUpgrade: true,
+                freeExamsRemaining: publishCheck.freeExamsRemaining,
+                oneTimeExamsRemaining: publishCheck.oneTimeExamsRemaining
+            };
         }
 
-        // Proceed to publish
+        // Consume quota and get exam mode
+        const examMode = await PaymentService.consumeExamQuota(userId);
+
+        // Publish exam with appropriate mode
         await prisma.exam.update({
             where: { id: examId },
-            data: { status: "PUBLISHED" }
+            data: { 
+                status: "PUBLISHED",
+                examMode: examMode
+            }
         });
 
-        revalidatePath(`/dashboard/exams/${examId}`);
-        return { success: true };
+        console.log(`✅ Exam ${examId} published in ${examMode} mode`);
 
-    } catch (e) {
-        console.error(e);
-        return { error: "System error during publish" };
+        revalidatePath(`/dashboard/exams/${examId}`);
+        revalidatePath('/dashboard');
+        
+        return { 
+            success: true, 
+            examMode,
+            message: examMode === 'FREE' 
+                ? `Exam published! ${publishCheck.freeExamsRemaining ? publishCheck.freeExamsRemaining - 1 : 0}/3 free exams remaining.`
+                : examMode === 'ONE_TIME'
+                ? 'Exam published with full integrity features!'
+                : 'Exam published with Pro features!'
+        };
+
+    } catch (e: any) {
+        console.error("Publish exam error:", e);
+        return { error: e.message || "System error during publish" };
     }
 }
 

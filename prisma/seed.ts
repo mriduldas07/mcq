@@ -17,7 +17,8 @@ async function main() {
             name: 'Demo Teacher',
             passwordHash: hashedPassword,
             planType: 'FREE',
-            credits: 5,
+            freeExamsUsed: 0,
+            oneTimeExamsRemaining: 0,
         },
     })
 

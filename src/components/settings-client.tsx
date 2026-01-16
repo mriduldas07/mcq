@@ -15,7 +15,8 @@ interface SettingsClientProps {
         email: string;
         image: string | null;
         planType: string;
-        credits: number;
+        freeExamsUsed: number;
+        oneTimeExamsRemaining: number;
         createdAt: Date;
     };
 }
@@ -173,8 +174,21 @@ export function SettingsClient({ user }: SettingsClientProps) {
                             </div>
                         </div>
                         <div>
-                            <p className="text-sm font-medium text-muted-foreground">Credits</p>
-                            <p className="text-2xl font-bold mt-1">{user.credits}</p>
+                            <p className="text-sm font-medium text-muted-foreground">Exam Quota</p>
+                            {user.planType === "PRO" ? (
+                                <p className="text-xl font-bold mt-1 text-purple-600">Unlimited</p>
+                            ) : (
+                                <div className="mt-1">
+                                    <p className="text-sm">
+                                        <span className="font-bold text-lg">{Math.max(0, 3 - (user.freeExamsUsed || 0))}</span> free left
+                                    </p>
+                                    {user.oneTimeExamsRemaining > 0 && (
+                                        <p className="text-xs text-muted-foreground">
+                                            + {user.oneTimeExamsRemaining} purchased
+                                        </p>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
                     <div>

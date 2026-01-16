@@ -18,7 +18,8 @@ interface UserAccountNavProps {
         email?: string | null;
         image?: string | null;
         planType?: string;
-        credits?: number;
+        freeExamsUsed?: number;
+        oneTimeExamsRemaining?: number;
     };
 }
 
@@ -129,13 +130,30 @@ export function UserAccountNav({ user }: UserAccountNavProps) {
                             )}
                         </div>
 
-                        {/* Credits Display */}
+                        {/* Quota Display */}
                         {user.planType !== "PRO" && (
-                            <div className="mt-2 text-sm text-muted-foreground">
-                                <span className="font-semibold text-foreground">
-                                    {user.credits || 0}
-                                </span>{" "}
-                                credits available
+                            <div className="mt-2 text-sm text-muted-foreground text-center">
+                                {(() => {
+                                    const freeRemaining = Math.max(0, 3 - (user.freeExamsUsed || 0));
+                                    const oneTime = user.oneTimeExamsRemaining || 0;
+                                    return (
+                                        <>
+                                            <span className="font-semibold text-foreground">
+                                                {freeRemaining}
+                                            </span>{" "}
+                                            free exams left
+                                            {oneTime > 0 && (
+                                                <>
+                                                    {" + "}
+                                                    <span className="font-semibold text-foreground">
+                                                        {oneTime}
+                                                    </span>{" "}
+                                                    purchased
+                                                </>
+                                            )}
+                                        </>
+                                    );
+                                })()}
                             </div>
                         )}
                     </div>

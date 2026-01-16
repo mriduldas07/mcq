@@ -16,18 +16,16 @@ import Link from "next/link";
 
 type PublishButtonProps = {
     examId: string;
-    userCredits: number;
+    canPublish: boolean;
     isPro: boolean;
     questionCount: number;
 };
 
-export function PublishButton({ examId, userCredits, isPro, questionCount }: PublishButtonProps) {
+export function PublishButton({ examId, canPublish, isPro, questionCount }: PublishButtonProps) {
     const [isPending, startTransition] = useTransition();
     const [showDialog, setShowDialog] = useState(false);
     const [errorMessage, setErrorMessage] = useState("");
 
-    // TASK 5: Check if user can publish
-    const canPublish = isPro || userCredits > 0;
     const hasQuestions = questionCount > 0;
 
     const handlePublish = () => {
@@ -38,7 +36,7 @@ export function PublishButton({ examId, userCredits, isPro, questionCount }: Pub
         }
 
         if (!canPublish) {
-            setErrorMessage("You don't have enough credits to publish this exam. Please purchase credits or upgrade to Pro.");
+            setErrorMessage("You don't have enough quota to publish this exam. Please purchase a one-time exam or upgrade to Pro.");
             setShowDialog(true);
             return;
         }
@@ -74,16 +72,13 @@ export function PublishButton({ examId, userCredits, isPro, questionCount }: Pub
                 <span className="text-xs sm:text-sm">
                     {isPending ? "Publishing..." : "Publish"}
                 </span>
-                {!isPro && canPublish && !isPending && (
-                    <span className="ml-1 text-[10px] sm:text-xs opacity-75 hidden sm:inline">(-1 credit)</span>
-                )}
             </Button>
 
             <Dialog open={showDialog} onOpenChange={setShowDialog}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
-                            <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0" />
+                            <AlertCircle className="h-5 w-5 text-destructive shrink-0" />
                             <span>Cannot Publish Exam</span>
                         </DialogTitle>
                         <DialogDescription className="pt-3 text-sm">

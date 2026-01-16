@@ -51,7 +51,7 @@ export default async function ExamEditorPage({
 
         user = await prisma.user.findUnique({
             where: { id: session.userId },
-            select: { credits: true, planType: true },
+            select: { planType: true, freeExamsUsed: true, oneTimeExamsRemaining: true },
         });
     } catch (e) {
         console.log("DB Error fetching exam", e);
@@ -89,21 +89,23 @@ export default async function ExamEditorPage({
         }])
     );
 
-    const userCredits = user?.credits || 0;
     const isPro = user?.planType === "PRO";
+    const freeExamsRemaining = user ? Math.max(0, 3 - (user.freeExamsUsed || 0)) : 0;
+    const oneTimeExamsRemaining = user?.oneTimeExamsRemaining || 0;
+    const canPublish = isPro || freeExamsRemaining > 0 || oneTimeExamsRemaining > 0;
 
     return (
         <div className="flex-1 space-y-4 sm:space-y-6 overflow-hidden w-full max-w-full px-3 sm:px-0">
             {/* Header Section */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 min-w-0">
-                <h2 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold tracking-tight break-words pr-2">{exam.title}</h2>
+                <h2 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold tracking-tight wrap-break-word pr-2">{exam.title}</h2>
                 <div className="flex flex-wrap items-center gap-2">
                     {exam.status === 'PUBLISHED' && <CopyLinkButton examId={examId} />}
                     <span className="text-xs sm:text-sm text-muted-foreground uppercase font-semibold whitespace-nowrap">{exam.status}</span>
                     {exam.status !== 'PUBLISHED' && (
                         <PublishButton 
                             examId={examId} 
-                            userCredits={userCredits}
+                            canPublish={canPublish}
                             isPro={isPro}
                             questionCount={exam.questions.length}
                         />
@@ -115,15 +117,15 @@ export default async function ExamEditorPage({
             </div>
 
             {/* Payment Warning Banner */}
-            {!isPro && userCredits === 0 && exam.status !== 'PUBLISHED' && (
+            {!isPro && freeExamsRemaining === 0 && oneTimeExamsRemaining === 0 && exam.status !== 'PUBLISHED' && (
                 <Card className="border-orange-200 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-900">
                     <CardContent className="p-4 sm:pt-6">
                         <div className="flex flex-col sm:flex-row items-start gap-3">
                             <AlertCircle className="h-5 w-5 text-orange-600 dark:text-orange-400 mt-0.5 shrink-0" />
                             <div className="flex-1 space-y-2">
-                                <h3 className="font-semibold text-orange-900 dark:text-orange-300 text-sm sm:text-base">No Credits Available</h3>
+                                <h3 className="font-semibold text-orange-900 dark:text-orange-300 text-sm sm:text-base">No Exams Available</h3>
                                 <p className="text-xs sm:text-sm text-orange-700 dark:text-orange-400">
-                                    You need credits to publish exams. Purchase credits or upgrade to Pro for unlimited exams.
+                                    You've used all 3 free exams. Purchase a one-time exam or upgrade to Pro for unlimited exams.
                                 </p>
                                 <Link href="/dashboard/billing">
                                     <Button variant="outline" size="sm" className="mt-2 border-orange-600 text-orange-700 hover:bg-orange-100 dark:border-orange-700 dark:text-orange-400 dark:hover:bg-orange-950 w-full sm:w-auto">
@@ -136,15 +138,18 @@ export default async function ExamEditorPage({
                 </Card>
             )}
 
-            {!isPro && userCredits > 0 && userCredits <= 2 && exam.status !== 'PUBLISHED' && (
+            {!isPro && (freeExamsRemaining === 1 || (freeExamsRemaining === 0 && oneTimeExamsRemaining > 0)) && exam.status !== 'PUBLISHED' && (
                 <Card className="border-yellow-200 bg-yellow-50 dark:bg-yellow-950/20 dark:border-yellow-900">
                     <CardContent className="p-4 sm:pt-6">
                         <div className="flex flex-col sm:flex-row items-start gap-3">
                             <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5 shrink-0" />
                             <div className="flex-1 space-y-2">
-                                <h3 className="font-semibold text-yellow-900 dark:text-yellow-300 text-sm sm:text-base">Low Credits</h3>
+                                <h3 className="font-semibold text-yellow-900 dark:text-yellow-300 text-sm sm:text-base">Running Low</h3>
                                 <p className="text-xs sm:text-sm text-yellow-700 dark:text-yellow-400">
-                                    You have {userCredits} credit{userCredits !== 1 ? 's' : ''} remaining. Consider topping up or upgrading to Pro.
+                                    {freeExamsRemaining > 0 
+                                        ? `Only ${freeExamsRemaining} free exam${freeExamsRemaining !== 1 ? 's' : ''} left. Consider upgrading to Pro.`
+                                        : `You have ${oneTimeExamsRemaining} purchased exam${oneTimeExamsRemaining !== 1 ? 's' : ''}. Upgrade to Pro for unlimited.`
+                                    }
                                 </p>
                                 <Link href="/dashboard/billing">
                                     <Button variant="outline" size="sm" className="mt-2 border-yellow-600 text-yellow-700 hover:bg-yellow-100 dark:border-yellow-700 dark:text-yellow-400 dark:hover:bg-yellow-950 w-full sm:w-auto">
@@ -234,21 +239,23 @@ export default async function ExamEditorPage({
                             ) : (
                                 <div>
                                     <div className="flex justify-between items-center mb-2">
-                                        <span className="text-sm text-muted-foreground">Credits</span>
-                                        <span className={`text-2xl font-bold ${
-                                            userCredits === 0 ? 'text-red-600' : 
-                                            userCredits <= 2 ? 'text-yellow-600' : 
-                                            'text-green-600'
-                                        }`}>
-                                            {userCredits}
-                                        </span>
+                                        <span className="text-sm text-muted-foreground">Exams Remaining</span>
+                                        <div className="text-right">
+                                            <span className={`text-2xl font-bold ${
+                                                freeExamsRemaining === 0 && oneTimeExamsRemaining === 0 ? 'text-red-600' : 
+                                                freeExamsRemaining <= 1 ? 'text-yellow-600' : 
+                                                'text-green-600'
+                                            }`}>
+                                                {freeExamsRemaining + oneTimeExamsRemaining}
+                                            </span>
+                                        </div>
                                     </div>
                                     <p className="text-xs text-muted-foreground mb-3">
-                                        1 credit = 1 exam publish
+                                        {freeExamsRemaining} free + {oneTimeExamsRemaining} purchased
                                     </p>
                                     <Link href="/dashboard/billing">
                                         <Button variant="default" size="sm" className="w-full">
-                                            Buy Credits or Upgrade
+                                            Buy More or Upgrade
                                         </Button>
                                     </Link>
                                 </div>

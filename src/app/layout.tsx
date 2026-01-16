@@ -3,6 +3,8 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { Suspense } from "react";
+import { PaddleCheckoutHandler } from "@/components/paddle-checkout-handler";
 
 // Satoshi: Primary font for ALL UI - dashboard, exam questions, forms, buttons, tables
 // Professional, highly readable, distraction-free
@@ -69,6 +71,9 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          <Suspense fallback={null}>
+            <PaddleCheckoutHandler />
+          </Suspense>
           {children}
           <Toaster />
         </ThemeProvider>

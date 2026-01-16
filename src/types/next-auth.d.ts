@@ -8,7 +8,8 @@ declare module "next-auth" {
       name: string;
       image: string;
       planType: string;
-      credits: number;
+      freeExamsUsed: number;
+      oneTimeExamsRemaining: number;
     } & DefaultSession["user"];
   }
 
@@ -18,7 +19,8 @@ declare module "next-auth" {
     name: string;
     image: string;
     planType: string;
-    credits: number;
+    freeExamsUsed: number;
+    oneTimeExamsRemaining: number;
   }
 }
 
@@ -29,6 +31,7 @@ declare module "next-auth/jwt" {
     name: string;
     picture: string;
     planType: string;
-    credits: number;
+    freeExamsUsed: number;
+    oneTimeExamsRemaining: number;
   }
 }

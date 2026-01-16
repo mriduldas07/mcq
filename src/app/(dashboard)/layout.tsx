@@ -25,7 +25,8 @@ export default async function DashboardLayout({
             email: true,
             image: true,
             planType: true,
-            credits: true,
+            freeExamsUsed: true,
+            oneTimeExamsRemaining: true,
         },
     });
 

@@ -42,7 +42,8 @@ export const authConfig = {
             name: true,
             image: true,
             planType: true,
-            credits: true,
+            freeExamsUsed: true,
+            oneTimeExamsRemaining: true,
             provider: true,
             providerAccountId: true,
           },
@@ -58,7 +59,8 @@ export const authConfig = {
               provider: "google",
               providerAccountId: account.providerAccountId,
               planType: "FREE",
-              credits: 0,
+              freeExamsUsed: 0,
+              oneTimeExamsRemaining: 0,
             },
             select: {
               id: true,
@@ -66,7 +68,8 @@ export const authConfig = {
               name: true,
               image: true,
               planType: true,
-              credits: true,
+              freeExamsUsed: true,
+              oneTimeExamsRemaining: true,
               provider: true,
               providerAccountId: true,
             },
@@ -85,7 +88,8 @@ export const authConfig = {
               name: true,
               image: true,
               planType: true,
-              credits: true,
+              freeExamsUsed: true,
+              oneTimeExamsRemaining: true,
               provider: true,
               providerAccountId: true,
             },
@@ -98,7 +102,8 @@ export const authConfig = {
         token.name = dbUser.name;
         token.picture = dbUser.image;
         token.planType = dbUser.planType;
-        token.credits = dbUser.credits;
+        token.freeExamsUsed = dbUser.freeExamsUsed;
+        token.oneTimeExamsRemaining = dbUser.oneTimeExamsRemaining;
       }
 
       return token;
@@ -111,7 +116,8 @@ export const authConfig = {
         session.user.name = token.name as string;
         session.user.image = token.picture as string;
         session.user.planType = token.planType as string;
-        session.user.credits = token.credits as number;
+        session.user.freeExamsUsed = token.freeExamsUsed as number;
+        session.user.oneTimeExamsRemaining = token.oneTimeExamsRemaining as number;
       }
 
       return session;
@@ -120,6 +126,17 @@ export const authConfig = {
   session: {
     strategy: "jwt",
     maxAge: 7 * 24 * 60 * 60, // 7 days
+  },
+  cookies: {
+    pkceCodeVerifier: {
+      name: "next-auth.pkce.code_verifier",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+      },
+    },
   },
   trustHost: true,
 } satisfies NextAuthConfig;

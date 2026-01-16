@@ -39,7 +39,8 @@ export default async function Home() {
         email: true,
         image: true,
         planType: true,
-        credits: true,
+        freeExamsUsed: true,
+        oneTimeExamsRemaining: true,
       },
     });
   }
