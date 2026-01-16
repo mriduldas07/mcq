@@ -30,26 +30,28 @@ export async function purchaseOneTimeExamAction() {
         let paddleCustomerId: string;
         
         try {
-            // Try to find existing customer by email
-            const customersResponse = await paddle.customers.list({
-                email: user.email
+            // Try to create new customer
+            const newCustomer = await paddle.customers.create({
+                email: user.email,
+                name: user.name || undefined
             });
-            
-            if (customersResponse.data && customersResponse.data.length > 0) {
-                paddleCustomerId = customersResponse.data[0].id;
-                console.log('Found existing Paddle customer:', paddleCustomerId);
-            } else {
-                // Create new customer
-                const newCustomer = await paddle.customers.create({
-                    email: user.email,
-                    name: user.name || undefined
-                });
-                paddleCustomerId = newCustomer.id;
-                console.log('Created new Paddle customer:', paddleCustomerId);
-            }
+            paddleCustomerId = newCustomer.id;
+            console.log('Created new Paddle customer:', paddleCustomerId);
         } catch (customerError: any) {
-            console.error('Customer creation/lookup failed:', customerError);
-            return { error: "Failed to setup customer account" };
+            // If customer already exists, extract ID from error message
+            if (customerError.code === 'customer_already_exists' && customerError.detail) {
+                const match = customerError.detail.match(/ctm_[a-z0-9]+/);
+                if (match) {
+                    paddleCustomerId = match[0];
+                    console.log('Using existing Paddle customer:', paddleCustomerId);
+                } else {
+                    console.error('Could not extract customer ID from error:', customerError);
+                    return { error: "Failed to setup customer account" };
+                }
+            } else {
+                console.error('Customer creation failed:', customerError);
+                return { error: "Failed to setup customer account" };
+            }
         }
 
         // Step 2: Create transaction with customer_id
@@ -127,26 +129,28 @@ export async function createProSubscriptionAction(
         let paddleCustomerId: string;
         
         try {
-            // Try to find existing customer by email
-            const customersResponse = await paddle.customers.list({
-                email: user.email
+            // Try to create new customer
+            const newCustomer = await paddle.customers.create({
+                email: user.email,
+                name: user.name || undefined
             });
-            
-            if (customersResponse.data && customersResponse.data.length > 0) {
-                paddleCustomerId = customersResponse.data[0].id;
-                console.log('Found existing Paddle customer:', paddleCustomerId);
-            } else {
-                // Create new customer
-                const newCustomer = await paddle.customers.create({
-                    email: user.email,
-                    name: user.name || undefined
-                });
-                paddleCustomerId = newCustomer.id;
-                console.log('Created new Paddle customer:', paddleCustomerId);
-            }
+            paddleCustomerId = newCustomer.id;
+            console.log('Created new Paddle customer:', paddleCustomerId);
         } catch (customerError: any) {
-            console.error('Customer creation/lookup failed:', customerError);
-            return { error: "Failed to setup customer account" };
+            // If customer already exists, extract ID from error message
+            if (customerError.code === 'customer_already_exists' && customerError.detail) {
+                const match = customerError.detail.match(/ctm_[a-z0-9]+/);
+                if (match) {
+                    paddleCustomerId = match[0];
+                    console.log('Using existing Paddle customer:', paddleCustomerId);
+                } else {
+                    console.error('Could not extract customer ID from error:', customerError);
+                    return { error: "Failed to setup customer account" };
+                }
+            } else {
+                console.error('Customer creation failed:', customerError);
+                return { error: "Failed to setup customer account" };
+            }
         }
 
         // Step 2: Create transaction with customer_id
