@@ -20,8 +20,11 @@ model User {
   providerAccountId     String? // Google account ID
   planType              PlanType @default(FREE)
   freeExamsUsed         Int      @default(0) // Track free exam usage (max 3)
-  oneTimeExamsRemaining Int      @default(0) // Purchased one-time exam slots
+  oneTimeExamsRemaining Int      @default(0) // Purchased one-time exam slots (examCredits)
   paddleCustomerId      String?  @unique // Paddle customer ID for payment processing
+  paddleSubscriptionId  String?  @unique // Current active Paddle subscription ID
+  subscriptionStatus    SubscriptionStatusType @default(NONE) // Quick access to subscription status
+  currentPeriodEnd      DateTime? // When current subscription period ends
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
@@ -34,11 +37,20 @@ model User {
 
   @@index([provider, providerAccountId])
   @@index([paddleCustomerId])
+  @@index([subscriptionStatus])
 }
 
 enum PlanType {
   FREE
   PRO
+}
+
+// User-level subscription status for quick access
+enum SubscriptionStatusType {
+  NONE      // No subscription
+  ACTIVE    // Active subscription
+  CANCELED  // Cancelled but still has access until period end
+  PAST_DUE  // Payment failed, needs attention
 }
 
 model Exam {

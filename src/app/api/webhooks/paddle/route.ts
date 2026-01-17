@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { PADDLE_WEBHOOK_SECRET, PADDLE_PRICE_IDS } from '@/lib/paddle';
 import { PaymentService } from '@/lib/payment-service';
 import { prisma } from '@/lib/prisma';
+import { SubscriptionStatusType, SubscriptionStatus } from '@prisma/client';
 import crypto from 'crypto';
 
 // ============================================================================
@@ -207,52 +208,113 @@ export async function POST(request: NextRequest) {
         // 5. Process event based on type
         switch (eventType) {
             // ----------------------------------------------------------------
-            // TRANSACTION COMPLETED - One-time purchases
+            // TRANSACTION COMPLETED - One-time purchases & subscription payments
+            // This is the SINGLE SOURCE OF TRUTH for payment success
             // ----------------------------------------------------------------
-            case 'transaction.completed': {
+            case 'transaction.completed':
+            case 'transaction.paid': {
                 const customerId = eventData.customer_id;
                 const customData = eventData.custom_data;
                 const transactionId = eventData.id;
                 const priceId = eventData.items?.[0]?.price?.id;
                 const totalAmount = parseInt(eventData.details?.totals?.total || '0');
                 const currency = eventData.currency_code || 'USD';
-
-                // Only process one-time exam purchases
-                if (priceId !== PADDLE_PRICE_IDS.ONE_TIME_EXAM) {
-                    console.log(`ℹ️ Transaction ${transactionId} is not a one-time exam purchase`);
-                    break;
-                }
+                const subscriptionId = eventData.subscription_id;
+                const origin = eventData.origin; // 'subscription_recurring', 'web', etc.
 
                 // Find user
                 const user = await findUserFromWebhookData(customerId, customData);
                 
                 if (!user) {
                     console.error(`❌ Could not find user for transaction ${transactionId}`);
-                    // Don't fail - return 200 to prevent retries, but log error
                     break;
                 }
 
-                // Update user's Paddle customer ID atomically if not set
-                await prisma.user.updateMany({
-                    where: { id: user.id, paddleCustomerId: null },
-                    data: { paddleCustomerId: customerId },
-                });
+                // Update user's Paddle customer ID if not set
+                if (customerId) {
+                    await prisma.user.updateMany({
+                        where: { id: user.id, paddleCustomerId: null },
+                        data: { paddleCustomerId: customerId },
+                    });
+                }
 
-                // Record payment
-                await prisma.payment.create({
-                    data: {
-                        teacherId: user.id,
-                        amount: totalAmount,
-                        currency,
-                        status: 'COMPLETED',
-                        type: 'ONE_TIME_EXAM',
+                // Handle ONE-TIME EXAM purchase (pay-per-exam)
+                if (priceId === PADDLE_PRICE_IDS.ONE_TIME_EXAM) {
+                    // Record payment in transaction history
+                    await prisma.payment.create({
+                        data: {
+                            teacherId: user.id,
+                            amount: totalAmount,
+                            currency,
+                            status: 'COMPLETED',
+                            type: 'ONE_TIME_EXAM',
+                        }
+                    });
+
+                    // Grant one exam credit - this does NOT affect subscription
+                    await PaymentService.grantOneTimeExam(user.id, 1);
+                    console.log(`✅ Granted 1 exam credit to user ${user.id} (transaction: ${transactionId})`);
+                    break;
+                }
+
+                // Handle SUBSCRIPTION payments (initial & renewals)
+                if (subscriptionId || origin === 'subscription_recurring' || 
+                    priceId === PADDLE_PRICE_IDS.PRO_MONTHLY || 
+                    priceId === PADDLE_PRICE_IDS.PRO_YEARLY) {
+                    
+                    // Record subscription payment in transaction history
+                    await prisma.payment.create({
+                        data: {
+                            teacherId: user.id,
+                            amount: totalAmount,
+                            currency,
+                            status: 'COMPLETED',
+                            type: 'SUBSCRIPTION',
+                        }
+                    });
+
+                    // If this is a renewal, update the subscription period
+                    if (subscriptionId) {
+                        const subscription = await prisma.subscription.findFirst({
+                            where: { paddleSubscriptionId: subscriptionId },
+                        });
+
+                        if (subscription) {
+                            const billingPeriod = eventData.billing_period;
+                            const periodEnd = billingPeriod?.ends_at 
+                                ? new Date(billingPeriod.ends_at) 
+                                : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+                            // Extend subscription period
+                            await prisma.subscription.update({
+                                where: { id: subscription.id },
+                                data: {
+                                    status: SubscriptionStatus.ACTIVE,
+                                    currentPeriodStart: billingPeriod?.starts_at ? new Date(billingPeriod.starts_at) : new Date(),
+                                    currentPeriodEnd: periodEnd,
+                                },
+                            });
+
+                            // Ensure user stays PRO and period is extended
+                            await prisma.user.update({
+                                where: { id: user.id },
+                                data: {
+                                    planType: 'PRO',
+                                    subscriptionStatus: SubscriptionStatusType.ACTIVE,
+                                    currentPeriodEnd: periodEnd,
+                                },
+                            });
+
+                            console.log(`✅ Extended subscription for user ${user.id} until ${periodEnd}`);
+                        }
                     }
-                });
 
-                // Grant one exam credit
-                await PaymentService.grantOneTimeExam(user.id, 1);
+                    console.log(`✅ Recorded subscription payment for user ${user.id} (transaction: ${transactionId})`);
+                    break;
+                }
 
-                console.log(`✅ Granted 1 exam credit to user ${user.id} (transaction: ${transactionId})`);
+                // Unknown transaction type - just log it
+                console.log(`ℹ️ Transaction ${transactionId} processed (type unknown, priceId: ${priceId})`);
                 break;
             }
 
@@ -277,14 +339,10 @@ export async function POST(request: NextRequest) {
                     break;
                 }
 
-                // Update user's Paddle customer ID atomically if not set
-                await prisma.user.updateMany({
-                    where: { id: user.id, paddleCustomerId: null },
-                    data: { paddleCustomerId: customerId },
-                });
-
                 // Determine plan from price ID or custom data
                 const plan = customData?.plan || getPlanFromPriceId(priceId || '');
+                const periodStart = billingPeriod?.starts_at ? new Date(billingPeriod.starts_at) : new Date();
+                const periodEnd = billingPeriod?.ends_at ? new Date(billingPeriod.ends_at) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
                 // Check if subscription already exists
                 const existingSub = await prisma.subscription.findFirst({
@@ -296,16 +354,14 @@ export async function POST(request: NextRequest) {
                     await prisma.subscription.update({
                         where: { id: existingSub.id },
                         data: {
-                            status: status === 'active' ? 'ACTIVE' : status === 'canceled' ? 'CANCELLED' : status === 'past_due' ? 'PAST_DUE' : 'ACTIVE',
-                            currentPeriodStart: billingPeriod?.starts_at ? new Date(billingPeriod.starts_at) : existingSub.currentPeriodStart,
-                            currentPeriodEnd: billingPeriod?.ends_at ? new Date(billingPeriod.ends_at) : existingSub.currentPeriodEnd,
+                            status: status === 'active' ? SubscriptionStatus.ACTIVE : status === 'canceled' ? SubscriptionStatus.CANCELLED : status === 'past_due' ? SubscriptionStatus.PAST_DUE : SubscriptionStatus.ACTIVE,
+                            currentPeriodStart: periodStart,
+                            currentPeriodEnd: periodEnd,
                         },
                     });
                     console.log(`✅ Updated subscription ${subscriptionId} for user ${user.id}`);
                 } else {
                     // Create new subscription
-                    const periodStart = billingPeriod?.starts_at ? new Date(billingPeriod.starts_at) : new Date();
-                    const periodEnd = billingPeriod?.ends_at ? new Date(billingPeriod.ends_at) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
                     await PaymentService.createSubscription(
                         user.id,
                         plan,
@@ -318,23 +374,43 @@ export async function POST(request: NextRequest) {
                     console.log(`✅ Created ${plan} subscription for user ${user.id}`);
                 }
 
-                // Upgrade user to PRO
+                // Update user with subscription info (single source of truth sync)
                 await prisma.user.update({
                     where: { id: user.id },
-                    data: { planType: 'PRO' },
+                    data: { 
+                        planType: 'PRO',
+                        paddleCustomerId: customerId,
+                        paddleSubscriptionId: subscriptionId,
+                        subscriptionStatus: SubscriptionStatusType.ACTIVE,
+                        currentPeriodEnd: periodEnd,
+                    },
                 });
 
+                // Record subscription payment in transaction history
+                await prisma.payment.create({
+                    data: {
+                        teacherId: user.id,
+                        amount: amount,
+                        currency: 'USD',
+                        status: 'COMPLETED',
+                        type: 'SUBSCRIPTION',
+                    }
+                });
+
+                console.log(`✅ User ${user.id} upgraded to PRO with subscription ${subscriptionId}`);
                 break;
             }
 
             // ----------------------------------------------------------------
-            // SUBSCRIPTION UPDATED - Plan changes, renewals
+            // SUBSCRIPTION UPDATED - Plan changes, renewals, billing cycle changes
+            // This handles monthly <-> yearly switches WITHOUT creating new subscription
             // ----------------------------------------------------------------
             case 'subscription.updated': {
                 const subscriptionId = eventData.id;
                 const status = eventData.status;
                 const billingPeriod = eventData.current_billing_period;
                 const scheduledChange = eventData.scheduled_change;
+                const priceId = eventData.items?.[0]?.price?.id;
 
                 // Find subscription
                 const subscription = await prisma.subscription.findFirst({
@@ -347,50 +423,91 @@ export async function POST(request: NextRequest) {
                     break;
                 }
 
-                // Map Paddle status to our status with guards
-                let newStatus: 'ACTIVE' | 'CANCELLED' | 'PAST_DUE' | 'EXPIRED' = 'ACTIVE';
-                if (status === 'canceled') newStatus = 'CANCELLED';
-                else if (status === 'past_due') newStatus = 'PAST_DUE';
-                else if (status === 'paused') newStatus = 'EXPIRED';
+                // Map Paddle status to our status
+                let newStatus: SubscriptionStatus = SubscriptionStatus.ACTIVE;
+                let userSubStatus: SubscriptionStatusType = SubscriptionStatusType.ACTIVE;
+                
+                if (status === 'canceled') {
+                    newStatus = SubscriptionStatus.CANCELLED;
+                    userSubStatus = SubscriptionStatusType.CANCELED;
+                } else if (status === 'past_due') {
+                    newStatus = SubscriptionStatus.PAST_DUE;
+                    userSubStatus = SubscriptionStatusType.PAST_DUE;
+                } else if (status === 'paused') {
+                    newStatus = SubscriptionStatus.EXPIRED;
+                    userSubStatus = SubscriptionStatusType.NONE;
+                }
+
+                // Determine new plan from price ID (for billing cycle changes)
+                const newPlan = priceId ? getPlanFromPriceId(priceId) : subscription.plan;
+                const periodEnd = billingPeriod?.ends_at ? new Date(billingPeriod.ends_at) : subscription.currentPeriodEnd;
 
                 // Update subscription with date guards
                 await prisma.subscription.update({
                     where: { id: subscription.id },
                     data: {
                         status: newStatus,
+                        plan: newPlan, // Update billing interval if changed
                         currentPeriodStart: billingPeriod?.starts_at ? new Date(billingPeriod.starts_at) : subscription.currentPeriodStart,
-                        currentPeriodEnd: billingPeriod?.ends_at ? new Date(billingPeriod.ends_at) : subscription.currentPeriodEnd,
+                        currentPeriodEnd: periodEnd,
                         cancelAtPeriodEnd: scheduledChange?.action === 'cancel',
                     },
                 });
 
-                // Update user plan type based on status
-                if (newStatus === 'ACTIVE') {
+                // Update user based on status
+                if (newStatus === SubscriptionStatus.ACTIVE) {
                     await prisma.user.update({
                         where: { id: subscription.userId },
-                        data: { planType: 'PRO' },
+                        data: { 
+                            planType: 'PRO',
+                            subscriptionStatus: SubscriptionStatusType.ACTIVE,
+                            currentPeriodEnd: periodEnd,
+                        },
                     });
-                } else if (newStatus === 'CANCELLED' || newStatus === 'EXPIRED') {
-                    // Check if period has ended
-                    const periodEnd = billingPeriod?.ends_at ? new Date(billingPeriod.ends_at) : new Date();
-                    if (new Date() >= periodEnd) {
-                        await prisma.user.update({
-                            where: { id: subscription.userId },
-                            data: { planType: 'FREE' },
-                        });
-                    }
+                } else if (newStatus === SubscriptionStatus.CANCELLED) {
+                    // Keep Pro access until period end (grace period)
+                    const periodEndDate = billingPeriod?.ends_at ? new Date(billingPeriod.ends_at) : new Date();
+                    const hasGracePeriod = new Date() < periodEndDate;
+                    
+                    await prisma.user.update({
+                        where: { id: subscription.userId },
+                        data: { 
+                            planType: hasGracePeriod ? 'PRO' : 'FREE', // Keep PRO during grace period
+                            subscriptionStatus: SubscriptionStatusType.CANCELED,
+                            currentPeriodEnd: periodEndDate,
+                        },
+                    });
+                } else if (newStatus === SubscriptionStatus.PAST_DUE) {
+                    await prisma.user.update({
+                        where: { id: subscription.userId },
+                        data: { 
+                            subscriptionStatus: SubscriptionStatusType.PAST_DUE,
+                            // Keep PRO access during past_due to allow payment retry
+                        },
+                    });
+                } else if (newStatus === SubscriptionStatus.EXPIRED) {
+                    await prisma.user.update({
+                        where: { id: subscription.userId },
+                        data: { 
+                            planType: 'FREE',
+                            subscriptionStatus: SubscriptionStatusType.NONE,
+                            paddleSubscriptionId: null,
+                            currentPeriodEnd: null,
+                        },
+                    });
                 }
 
-                console.log(`✅ Updated subscription ${subscriptionId} - status: ${newStatus}`);
+                console.log(`✅ Updated subscription ${subscriptionId} - status: ${newStatus}, plan: ${newPlan}`);
                 break;
             }
 
             // ----------------------------------------------------------------
-            // SUBSCRIPTION CANCELED
+            // SUBSCRIPTION CANCELED - User keeps access until currentPeriodEnd
             // ----------------------------------------------------------------
             case 'subscription.canceled': {
                 const subscriptionId = eventData.id;
                 const effectiveAt = eventData.scheduled_change?.effective_at;
+                const billingPeriod = eventData.current_billing_period;
 
                 // Find and update subscription
                 const subscription = await prisma.subscription.findFirst({
@@ -398,24 +515,46 @@ export async function POST(request: NextRequest) {
                 });
 
                 if (subscription) {
+                    const periodEnd = billingPeriod?.ends_at 
+                        ? new Date(billingPeriod.ends_at) 
+                        : subscription.currentPeriodEnd;
+                    
                     await prisma.subscription.update({
                         where: { id: subscription.id },
                         data: {
-                            status: 'CANCELLED',
+                            status: SubscriptionStatus.CANCELLED,
                             cancelledAt: new Date(),
                             cancelAtPeriodEnd: true,
                         },
                     });
 
-                    // If immediate cancellation, downgrade now
-                    if (!effectiveAt || new Date(effectiveAt) <= new Date()) {
+                    // Determine if immediate or end-of-period cancellation
+                    const isImmediate = !effectiveAt || new Date(effectiveAt) <= new Date();
+                    const hasGracePeriod = periodEnd && new Date() < periodEnd;
+
+                    if (isImmediate && !hasGracePeriod) {
+                        // Immediate downgrade - no grace period
                         await prisma.user.update({
                             where: { id: subscription.userId },
-                            data: { planType: 'FREE' },
+                            data: { 
+                                planType: 'FREE',
+                                subscriptionStatus: SubscriptionStatusType.NONE,
+                                paddleSubscriptionId: null,
+                                currentPeriodEnd: null,
+                            },
                         });
                         console.log(`⬇️ Immediately downgraded user ${subscription.userId}`);
                     } else {
-                        console.log(`📅 User ${subscription.userId} will be downgraded at ${effectiveAt}`);
+                        // Grace period - keep Pro until period end
+                        await prisma.user.update({
+                            where: { id: subscription.userId },
+                            data: { 
+                                subscriptionStatus: SubscriptionStatusType.CANCELED,
+                                currentPeriodEnd: periodEnd,
+                                // planType stays PRO until period ends
+                            },
+                        });
+                        console.log(`📅 User ${subscription.userId} will be downgraded at ${periodEnd}`);
                     }
                 }
 
@@ -424,22 +563,34 @@ export async function POST(request: NextRequest) {
             }
 
             // ----------------------------------------------------------------
-            // SUBSCRIPTION PAST DUE - Payment failed
+            // SUBSCRIPTION PAST DUE - Payment failed, user keeps access temporarily
             // ----------------------------------------------------------------
             case 'subscription.past_due': {
                 const subscriptionId = eventData.id;
 
-                await prisma.subscription.updateMany({
+                const subscription = await prisma.subscription.findFirst({
                     where: { paddleSubscriptionId: subscriptionId },
-                    data: { status: 'PAST_DUE' },
                 });
+
+                if (subscription) {
+                    await prisma.subscription.update({
+                        where: { id: subscription.id },
+                        data: { status: SubscriptionStatus.PAST_DUE },
+                    });
+
+                    // Update user status but keep PRO access to allow payment retry
+                    await prisma.user.update({
+                        where: { id: subscription.userId },
+                        data: { subscriptionStatus: SubscriptionStatusType.PAST_DUE },
+                    });
+                }
 
                 console.log(`⚠️ Subscription ${subscriptionId} is past due`);
                 break;
             }
 
             // ----------------------------------------------------------------
-            // SUBSCRIPTION PAUSED
+            // SUBSCRIPTION PAUSED - Temporarily suspend access
             // ----------------------------------------------------------------
             case 'subscription.paused': {
                 const subscriptionId = eventData.id;
@@ -451,13 +602,16 @@ export async function POST(request: NextRequest) {
                 if (subscription) {
                     await prisma.subscription.update({
                         where: { id: subscription.id },
-                        data: { status: 'EXPIRED' }, // Use EXPIRED for paused
+                        data: { status: SubscriptionStatus.EXPIRED }, // Use EXPIRED for paused
                     });
 
                     // Downgrade user while paused
                     await prisma.user.update({
                         where: { id: subscription.userId },
-                        data: { planType: 'FREE' },
+                        data: { 
+                            planType: 'FREE',
+                            subscriptionStatus: SubscriptionStatusType.NONE,
+                        },
                     });
                 }
 
@@ -466,25 +620,37 @@ export async function POST(request: NextRequest) {
             }
 
             // ----------------------------------------------------------------
-            // SUBSCRIPTION RESUMED
+            // SUBSCRIPTION RESUMED - Restore access
             // ----------------------------------------------------------------
             case 'subscription.resumed': {
                 const subscriptionId = eventData.id;
+                const billingPeriod = eventData.current_billing_period;
 
                 const subscription = await prisma.subscription.findFirst({
                     where: { paddleSubscriptionId: subscriptionId },
                 });
 
                 if (subscription) {
+                    const periodEnd = billingPeriod?.ends_at 
+                        ? new Date(billingPeriod.ends_at) 
+                        : subscription.currentPeriodEnd;
+
                     await prisma.subscription.update({
                         where: { id: subscription.id },
-                        data: { status: 'ACTIVE' },
+                        data: { 
+                            status: SubscriptionStatus.ACTIVE,
+                            currentPeriodEnd: periodEnd,
+                        },
                     });
 
                     // Upgrade user back to PRO
                     await prisma.user.update({
                         where: { id: subscription.userId },
-                        data: { planType: 'PRO' },
+                        data: { 
+                            planType: 'PRO',
+                            subscriptionStatus: SubscriptionStatusType.ACTIVE,
+                            currentPeriodEnd: periodEnd,
+                        },
                     });
                 }
 

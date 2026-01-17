@@ -1,10 +1,18 @@
 import { prisma } from "@/lib/prisma";
+import { SubscriptionStatusType, SubscriptionStatus } from "@prisma/client";
 
 /**
  * Payment Service - NEW PRICING MODEL
  * 
+ * CORE BUSINESS RULES (NON-NEGOTIABLE):
+ * 1. A user can have ONLY ONE active subscription at a time
+ * 2. Subscription and pay-per-exam must NEVER overlap logically
+ * 3. Monthly and yearly are the SAME plan ("Pro") with different billing intervals
+ * 4. Pay-per-exam must NEVER create a subscription
+ * 5. Paddle webhooks are the ONLY source of truth
+ * 
  * Plans:
- * - FREE: 3 free exams (lifetime), limited features
+ * - FREE: 3 free exams (lifetime), basic anti-cheat, limited question bank
  * - PRO: $11.99/month or $99/year, unlimited exams, full features
  * - ONE-TIME: $1.99 per exam, full features for that exam only
  */
@@ -12,6 +20,7 @@ import { prisma } from "@/lib/prisma";
 export const PaymentService = {
     /**
      * Check if user can publish an exam
+     * Priority order: PRO subscription > One-time credits > Free quota
      * @returns { canPublish: boolean, reason?: string, examMode: 'FREE'|'PRO'|'ONE_TIME' }
      */
     async canPublishExam(userId: string): Promise<{
@@ -27,15 +36,8 @@ export const PaymentService = {
                 planType: true,
                 freeExamsUsed: true,
                 oneTimeExamsRemaining: true,
-                subscriptions: {
-                    where: {
-                        status: 'ACTIVE',
-                    },
-                    orderBy: {
-                        currentPeriodEnd: 'desc'
-                    },
-                    take: 1
-                }
+                subscriptionStatus: true,
+                currentPeriodEnd: true,
             },
         });
 
@@ -43,21 +45,22 @@ export const PaymentService = {
             return { canPublish: false, reason: "User not found" };
         }
 
-        // Check Pro subscription status
-        const hasActiveSubscription = user.subscriptions.length > 0;
+        // RULE: Check Pro subscription status using User-level fields (faster)
+        // Active subscription = subscriptionStatus is ACTIVE and period hasn't ended
+        const hasActiveSubscription = 
+            (user.subscriptionStatus === SubscriptionStatusType.ACTIVE || user.subscriptionStatus === SubscriptionStatusType.CANCELED) &&
+            user.currentPeriodEnd && 
+            new Date() <= user.currentPeriodEnd;
         
         if (hasActiveSubscription) {
-            const subscription = user.subscriptions[0];
-            // Verify subscription hasn't expired
-            if (new Date() <= subscription.currentPeriodEnd) {
-                return {
-                    canPublish: true,
-                    examMode: 'PRO'
-                };
-            }
+            return {
+                canPublish: true,
+                examMode: 'PRO'
+            };
         }
 
-        // Check one-time exam purchases
+        // RULE: Check one-time exam credits (examCredits)
+        // These are INDEPENDENT from subscription - never convert to subscription
         if (user.oneTimeExamsRemaining > 0) {
             return {
                 canPublish: true,
@@ -66,7 +69,7 @@ export const PaymentService = {
             };
         }
 
-        // Check free exam quota
+        // RULE: Check free exam quota (3 lifetime exams)
         const freeExamsRemaining = Math.max(0, 3 - user.freeExamsUsed);
         if (freeExamsRemaining > 0) {
             return {
@@ -76,7 +79,7 @@ export const PaymentService = {
             };
         }
 
-        // No quota available
+        // No quota available - show upgrade options
         return {
             canPublish: false,
             reason: "No exams available. Upgrade to Pro or purchase a one-time exam.",
@@ -135,7 +138,7 @@ export const PaymentService = {
             data: {
                 userId,
                 plan,
-                status: 'ACTIVE',
+                status: SubscriptionStatus.ACTIVE,
                 paddleSubscriptionId,
                 paddleCustomerId,
                 currentPeriodStart,
@@ -160,7 +163,7 @@ export const PaymentService = {
             where: { id: subscriptionId },
             data: {
                 cancelAtPeriodEnd: true,
-                status: 'CANCELLED',
+                status: SubscriptionStatus.CANCELLED,
                 cancelledAt: new Date()
             }
         });
@@ -186,43 +189,63 @@ export const PaymentService = {
 
     /**
      * Check if user has active Pro subscription
+     * Uses User-level fields for fast access (single source of truth sync)
      */
     async hasActiveProSubscription(userId: string): Promise<boolean> {
-        const subscription = await prisma.subscription.findFirst({
-            where: {
-                userId,
-                status: 'ACTIVE',
-                currentPeriodEnd: {
-                    gte: new Date()
-                }
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+                subscriptionStatus: true,
+                currentPeriodEnd: true,
             }
         });
 
-        return !!subscription;
+        if (!user) return false;
+
+        // Active if status is ACTIVE or CANCELED (grace period) and period hasn't ended
+        const isActive = 
+            (user.subscriptionStatus === SubscriptionStatusType.ACTIVE || user.subscriptionStatus === SubscriptionStatusType.CANCELED) &&
+            user.currentPeriodEnd !== null && 
+            new Date() <= user.currentPeriodEnd;
+
+        return !!isActive;
     },
 
     /**
      * Get user's subscription details
+     * Returns comprehensive billing status
      */
     async getSubscriptionDetails(userId: string) {
-        const subscription = await prisma.subscription.findFirst({
-            where: { userId },
-            orderBy: { currentPeriodEnd: 'desc' }
-        });
-
         const user = await prisma.user.findUnique({
             where: { id: userId },
             select: {
                 freeExamsUsed: true,
                 oneTimeExamsRemaining: true,
-                planType: true
+                planType: true,
+                subscriptionStatus: true,
+                currentPeriodEnd: true,
+                paddleSubscriptionId: true,
             }
         });
+
+        // Also get full subscription record for detailed info
+        const subscription = await prisma.subscription.findFirst({
+            where: { userId },
+            orderBy: { currentPeriodEnd: 'desc' }
+        });
+
+        // Determine if user has active access (including grace period)
+        const hasActiveAccess = user && 
+            (user.subscriptionStatus === SubscriptionStatusType.ACTIVE || user.subscriptionStatus === SubscriptionStatusType.CANCELED) &&
+            user.currentPeriodEnd && 
+            new Date() <= user.currentPeriodEnd;
 
         return {
             subscription,
             user,
-            freeExamsRemaining: user ? Math.max(0, 3 - user.freeExamsUsed) : 0
+            freeExamsRemaining: user ? Math.max(0, 3 - user.freeExamsUsed) : 0,
+            hasActiveAccess,
+            subscriptionStatus: user?.subscriptionStatus || SubscriptionStatusType.NONE,
         };
     },
 

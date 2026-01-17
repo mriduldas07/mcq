@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { verifySession } from "@/lib/session";
 import { redirect } from "next/navigation";
 import { BillingClient } from "@/components/billing-client";
+import { SubscriptionStatusType } from "@prisma/client";
 
 export const dynamic = 'force-dynamic';
 
@@ -11,6 +12,7 @@ export default async function BillingPage() {
 
     try {
         // Fetch user with subscription and payment data
+        // Using User-level subscriptionStatus for quick access (single source of truth)
         const user = await prisma.user.findUnique({
             where: { id: session.userId },
             select: {
@@ -18,8 +20,9 @@ export default async function BillingPage() {
                 planType: true,
                 freeExamsUsed: true,
                 oneTimeExamsRemaining: true,
+                subscriptionStatus: true,
+                currentPeriodEnd: true,
                 subscriptions: {
-                    where: { status: 'ACTIVE' },
                     orderBy: { currentPeriodEnd: 'desc' },
                     take: 1,
                     select: {
@@ -32,7 +35,7 @@ export default async function BillingPage() {
                 },
                 payments: {
                     orderBy: { createdAt: 'desc' },
-                    take: 10,
+                    take: 20, // Show more transaction history
                     select: {
                         id: true,
                         type: true,
@@ -53,17 +56,23 @@ export default async function BillingPage() {
         const freeExamsRemaining = Math.max(0, 3 - (user.freeExamsUsed || 0));
         const oneTimeExamsRemaining = user.oneTimeExamsRemaining || 0;
         
-        // Check if user has active Pro subscription
+        // Get subscription status from User-level field (faster, single source of truth)
+        const subscriptionStatus = user.subscriptionStatus;
+        
+        // Check if user has active Pro access (including grace period)
         const activeSubscription = user.subscriptions[0] || null;
-        const isPro = activeSubscription 
-            ? new Date() <= activeSubscription.currentPeriodEnd
-            : user.planType === "PRO";
+        const isPro = (
+            (subscriptionStatus === SubscriptionStatusType.ACTIVE || subscriptionStatus === SubscriptionStatusType.CANCELED) &&
+            user.currentPeriodEnd && 
+            new Date() <= user.currentPeriodEnd
+        ) || user.planType === "PRO";
 
         return (
             <BillingClient
                 isPro={isPro}
                 freeExamsRemaining={freeExamsRemaining}
                 oneTimeExamsRemaining={oneTimeExamsRemaining}
+                subscriptionStatus={subscriptionStatus}
                 subscription={activeSubscription}
                 payments={user.payments}
             />
@@ -78,6 +87,7 @@ export default async function BillingPage() {
                 isPro={false}
                 freeExamsRemaining={3}
                 oneTimeExamsRemaining={0}
+                subscriptionStatus={SubscriptionStatusType.NONE}
                 subscription={null}
                 payments={[]}
             />

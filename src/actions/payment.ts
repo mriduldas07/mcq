@@ -4,6 +4,7 @@ import { verifySession } from "@/lib/session";
 import { PaymentService } from "@/lib/payment-service";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { SubscriptionStatus } from "@prisma/client";
 import { 
     PADDLE_PRICE_IDS, 
     getOrCreatePaddleCustomer, 
@@ -284,7 +285,7 @@ export async function cancelSubscriptionAction(
             return { error: "You don't have permission to cancel this subscription" };
         }
 
-        if (subscription.status === 'CANCELLED') {
+        if (subscription.status === SubscriptionStatus.CANCELLED) {
             return { error: "Subscription is already cancelled" };
         }
 
@@ -371,7 +372,7 @@ export async function getSubscriptionDetailsAction() {
         const subscription = await prisma.subscription.findFirst({
             where: { 
                 userId: session.userId,
-                status: 'ACTIVE'
+                status: SubscriptionStatus.ACTIVE
             },
             orderBy: { createdAt: 'desc' }
         });
@@ -469,7 +470,7 @@ export async function getUserBillingStatusAction() {
                 freeExamsUsed: true,
                 oneTimeExamsRemaining: true,
                 subscriptions: {
-                    where: { status: 'ACTIVE' },
+                    where: { status: SubscriptionStatus.ACTIVE },
                     orderBy: { currentPeriodEnd: 'desc' },
                     take: 1,
                 },
