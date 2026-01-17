@@ -7,17 +7,49 @@ import { Check, Sparkles, Loader2, CheckCircle2, XCircle, AlertCircle } from "lu
 import { purchaseOneTimeExamAction, createProSubscriptionAction, cancelSubscriptionAction } from "@/actions/payment";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { SubscriptionStatusType } from "@prisma/client";
+
+// Import SubscriptionStatusType with fallback for before migration
+const SubscriptionStatusType = (() => {
+    if (typeof window !== 'undefined') {
+        // Client-side fallback
+        return {
+            NONE: "NONE",
+            ACTIVE: "ACTIVE",
+            CANCELED: "CANCELED",
+            PAST_DUE: "PAST_DUE"
+        };
+    }
+    // Server-side
+    try {
+        const client = require("@prisma/client");
+        return client.SubscriptionStatusType || {
+            NONE: "NONE",
+            ACTIVE: "ACTIVE",
+            CANCELED: "CANCELED",
+            PAST_DUE: "PAST_DUE"
+        };
+    } catch (error) {
+        return {
+            NONE: "NONE",
+            ACTIVE: "ACTIVE",
+            CANCELED: "CANCELED",
+            PAST_DUE: "PAST_DUE"
+        };
+    }
+})();
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
+// Define subscription status type to match Prisma enum
+type SubscriptionStatusTypeValue = 'NONE' | 'ACTIVE' | 'CANCELED' | 'PAST_DUE';
+
 interface BillingClientProps {
     isPro: boolean;
     freeExamsRemaining: number;
     oneTimeExamsRemaining: number;
-    subscriptionStatus: SubscriptionStatusType;
+    subscriptionStatus: SubscriptionStatusTypeValue;
     subscription?: {
         id: string;
         plan: string;
@@ -205,9 +237,26 @@ export function BillingClient({
 
     // FRONTEND GUARD: Check if user can subscribe
     // User should NOT be able to subscribe if they already have an active subscription
-    const canSubscribe = subscriptionStatus !== SubscriptionStatusType.ACTIVE;
-    const isInGracePeriod = subscriptionStatus === SubscriptionStatusType.CANCELED && isPro;
+    // Check BOTH isPro and subscriptionStatus to handle all cases
+    const hasActiveSubscription = 
+        isPro || 
+        subscriptionStatus === SubscriptionStatusType.ACTIVE ||
+        (subscriptionStatus === SubscriptionStatusType.CANCELED && subscription && new Date() <= new Date(subscription.currentPeriodEnd));
+    
+    const canSubscribe = !hasActiveSubscription;
+    
+    // Grace period: User cancelled but still has access until period end
+    // Check BOTH cancelAtPeriodEnd flag AND subscriptionStatus (webhooks may reset status)
+    const isInGracePeriod = (
+        (subscription?.cancelAtPeriodEnd === true) ||
+        (subscriptionStatus === SubscriptionStatusType.CANCELED)
+    ) && isPro && subscription && new Date() <= new Date(subscription.currentPeriodEnd);
+    
     const isPastDue = subscriptionStatus === SubscriptionStatusType.PAST_DUE;
+    
+    // Determine current plan type for blocking duplicate purchases
+    const hasMonthlyPlan = !!(subscription?.plan === 'MONTHLY' && hasActiveSubscription);
+    const hasYearlyPlan = !!(subscription?.plan === 'YEARLY' && hasActiveSubscription);
 
     // Clear URL params after showing banner
     useEffect(() => {
@@ -323,6 +372,17 @@ export function BillingClient({
         });
     }, [subscription?.id, router]);
 
+    // Handle plan switching (Monthly <-> Yearly)
+    const handleSwitchPlan = useCallback((targetPlan: 'MONTHLY' | 'YEARLY') => {
+        const planName = targetPlan === 'MONTHLY' ? 'Monthly ($11.99/month)' : 'Yearly ($99/year)';
+        
+        toast.info(`Plan switching will be available soon. For now, please cancel your current subscription and resubscribe to the ${planName} plan.`);
+        
+        // TODO: Implement Paddle subscription update API
+        // This should use subscription.updated webhook to change billing interval
+        // without creating a new subscription
+    }, []);
+
     // Format currency
     const formatAmount = (amount: number, currency: string = 'USD') => {
         return new Intl.NumberFormat('en-US', {
@@ -365,28 +425,42 @@ export function BillingClient({
             {/* Active Subscription Notice */}
             {isPro && subscription && (
                 <div className="max-w-6xl mx-auto mb-6">
-                    <Card className={`border-primary bg-primary/5 ${isPastDue ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-950' : ''}`}>
+                    <Card className={`${
+                        isPastDue 
+                            ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-950' 
+                            : isInGracePeriod || subscription.cancelAtPeriodEnd
+                                ? 'border-orange-500 bg-orange-50 dark:bg-orange-950'
+                                : 'border-primary bg-primary/5'
+                    }`}>
                         <CardContent className="pt-6">
                             <div className="flex items-center justify-between flex-wrap gap-4">
                                 <div className="flex items-center gap-3">
-                                    <div className={`h-10 w-10 rounded-full flex items-center justify-center ${isPastDue ? 'bg-yellow-100' : 'bg-primary/10'}`}>
+                                    <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                                        isPastDue 
+                                            ? 'bg-yellow-100 dark:bg-yellow-900' 
+                                            : isInGracePeriod || subscription.cancelAtPeriodEnd
+                                                ? 'bg-orange-100 dark:bg-orange-900'
+                                                : 'bg-primary/10'
+                                    }`}>
                                         {isPastDue ? (
                                             <AlertCircle className="h-5 w-5 text-yellow-600" />
+                                        ) : isInGracePeriod || subscription.cancelAtPeriodEnd ? (
+                                            <AlertCircle className="h-5 w-5 text-orange-600" />
                                         ) : (
                                             <Sparkles className="h-5 w-5 text-primary" />
                                         )}
                                     </div>
                                     <div>
                                         <p className="font-semibold">
-                                            Pro {subscription.plan} Plan
-                                            {isInGracePeriod && <span className="ml-2 text-xs text-orange-600">(Cancelling)</span>}
+                                            Pro {subscription.plan === 'MONTHLY' ? 'Monthly' : subscription.plan === 'YEARLY' ? 'Yearly' : subscription.plan} Plan
+                                            {(isInGracePeriod || subscription.cancelAtPeriodEnd) && <span className="ml-2 text-xs font-normal px-2 py-0.5 bg-orange-200 dark:bg-orange-800 text-orange-800 dark:text-orange-200 rounded-full">Cancelling</span>}
                                             {isPastDue && <span className="ml-2 text-xs text-yellow-600">(Payment Issue)</span>}
                                         </p>
                                         <p className="text-sm text-muted-foreground">
                                             {isPastDue 
                                                 ? 'Payment failed. Please update your payment method.'
                                                 : isInGracePeriod || subscription.cancelAtPeriodEnd 
-                                                    ? `Access until ${formatDate(subscription.currentPeriodEnd)}`
+                                                    ? `You have full Pro access until ${formatDate(subscription.currentPeriodEnd)}`
                                                     : `Renews on ${formatDate(subscription.currentPeriodEnd)}`
                                             }
                                         </p>
@@ -477,7 +551,7 @@ export function BillingClient({
 
                 {/* PRO PLAN */}
                 <Card className="flex flex-col border-primary shadow-lg relative overflow-hidden">
-                    <div className="absolute top-0 right-0 bg-gradient-to-l from-primary to-primary/80 text-primary-foreground text-xs px-3 py-1 rounded-bl-lg font-medium flex items-center gap-1">
+                    <div className="absolute top-0 right-0 bg-linear-to-l from-primary to-primary/80 text-primary-foreground text-xs px-3 py-1 rounded-bl-lg font-medium flex items-center gap-1">
                         <Sparkles className="h-3 w-3" />
                         {isPro ? "Active" : "Most Popular"}
                     </div>
@@ -528,17 +602,40 @@ export function BillingClient({
                     </CardContent>
                     <CardFooter className="flex-col gap-2">
                         {/* FRONTEND GUARD: Show appropriate button based on subscription status */}
-                        {subscriptionStatus === SubscriptionStatusType.ACTIVE ? (
-                            // Active subscription - show "Current Plan" and prevent new checkout
-                            <Button variant="outline" className="w-full" disabled>
-                                ✓ Active Pro Subscription
-                            </Button>
-                        ) : isInGracePeriod ? (
-                            // Cancelled but in grace period - show resubscribe option
+                        {hasActiveSubscription && !isInGracePeriod ? (
+                            // Active subscription - show which plan is active and allow switching
                             <>
-                                <p className="text-xs text-muted-foreground mb-2 text-center">
-                                    Your subscription ends on {subscription ? formatDate(subscription.currentPeriodEnd) : 'soon'}
+                                <Button 
+                                    className="w-full" 
+                                    variant={hasMonthlyPlan ? "default" : "outline"}
+                                    disabled={hasMonthlyPlan}
+                                    onClick={() => !hasMonthlyPlan && handleSwitchPlan('MONTHLY')}
+                                >
+                                    {hasMonthlyPlan ? '✓ Current Plan - Monthly' : 'Monthly - $11.99/mo'}
+                                </Button>
+                                <Button 
+                                    variant={hasYearlyPlan ? "default" : "outline"}
+                                    className="w-full"
+                                    disabled={hasYearlyPlan}
+                                    onClick={() => !hasYearlyPlan && handleSwitchPlan('YEARLY')}
+                                >
+                                    {hasYearlyPlan ? '✓ Current Plan - Yearly' : 'Yearly - $99/yr (Save $44)'}
+                                </Button>
+                                <p className="text-xs text-muted-foreground text-center mt-2">
+                                    {hasMonthlyPlan ? 'Upgrade to Yearly and save $44.88/year' : hasYearlyPlan ? 'You have the best value plan!' : ''}
                                 </p>
+                            </>
+                        ) : isInGracePeriod ? (
+                            // Cancelled but in grace period - show status and resubscribe option
+                            <>
+                                <div className="w-full p-3 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800 rounded-lg mb-2">
+                                    <p className="text-sm font-medium text-orange-800 dark:text-orange-200">
+                                        ✓ Pro {subscription?.plan === 'MONTHLY' ? 'Monthly' : 'Yearly'} (Cancelling)
+                                    </p>
+                                    <p className="text-xs text-orange-600 dark:text-orange-400">
+                                        You have full Pro access until {subscription ? formatDate(subscription.currentPeriodEnd) : 'the end of your billing period'}
+                                    </p>
+                                </div>
                                 <Button
                                     className="w-full"
                                     onClick={() => handleUpgradePro('MONTHLY')}

@@ -4,7 +4,6 @@ import { verifySession } from "@/lib/session";
 import { PaymentService } from "@/lib/payment-service";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { SubscriptionStatus } from "@prisma/client";
 import { 
     PADDLE_PRICE_IDS, 
     getOrCreatePaddleCustomer, 
@@ -13,6 +12,26 @@ import {
     validatePriceIds,
     verifyPaddleTransaction,
 } from "@/lib/paddle";
+
+// Import SubscriptionStatus with fallback for before migration
+const SubscriptionStatus = (() => {
+    try {
+        const client = require("@prisma/client");
+        return client.SubscriptionStatus || {
+            ACTIVE: "ACTIVE",
+            EXPIRED: "EXPIRED",
+            CANCELLED: "CANCELLED",
+            PAST_DUE: "PAST_DUE"
+        };
+    } catch (error) {
+        return {
+            ACTIVE: "ACTIVE",
+            EXPIRED: "EXPIRED",
+            CANCELLED: "CANCELLED",
+            PAST_DUE: "PAST_DUE"
+        };
+    }
+})();
 
 // ============================================================================
 // TYPES

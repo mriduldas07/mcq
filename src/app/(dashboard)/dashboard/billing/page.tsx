@@ -2,7 +2,27 @@ import { prisma } from "@/lib/prisma";
 import { verifySession } from "@/lib/session";
 import { redirect } from "next/navigation";
 import { BillingClient } from "@/components/billing-client";
-import { SubscriptionStatusType } from "@prisma/client";
+
+// Import SubscriptionStatusType with fallback for before migration
+const SubscriptionStatusType = (() => {
+    try {
+        const client = require("@prisma/client");
+        return client.SubscriptionStatusType || {
+            NONE: "NONE",
+            ACTIVE: "ACTIVE",
+            CANCELED: "CANCELED",
+            PAST_DUE: "PAST_DUE"
+        };
+    } catch (error) {
+        // Fallback if Prisma client not generated yet
+        return {
+            NONE: "NONE",
+            ACTIVE: "ACTIVE",
+            CANCELED: "CANCELED",
+            PAST_DUE: "PAST_DUE"
+        };
+    }
+})();
 
 export const dynamic = 'force-dynamic';
 

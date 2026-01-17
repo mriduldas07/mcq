@@ -1,9 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { PADDLE_WEBHOOK_SECRET, PADDLE_PRICE_IDS } from '@/lib/paddle';
 import { PaymentService } from '@/lib/payment-service';
 import { prisma } from '@/lib/prisma';
-import { SubscriptionStatusType, SubscriptionStatus } from '@prisma/client';
 import crypto from 'crypto';
+
+// Import enums with fallback for before migration
+const SubscriptionStatusType = (() => {
+    try {
+        const client = require("@prisma/client");
+        return client.SubscriptionStatusType || {
+            NONE: "NONE",
+            ACTIVE: "ACTIVE",
+            CANCELED: "CANCELED",
+            PAST_DUE: "PAST_DUE"
+        };
+    } catch (error) {
+        return {
+            NONE: "NONE",
+            ACTIVE: "ACTIVE",
+            CANCELED: "CANCELED",
+            PAST_DUE: "PAST_DUE"
+        };
+    }
+})();
+
+const SubscriptionStatus = (() => {
+    try {
+        const client = require("@prisma/client");
+        return client.SubscriptionStatus || {
+            ACTIVE: "ACTIVE",
+            EXPIRED: "EXPIRED",
+            CANCELLED: "CANCELLED",
+            PAST_DUE: "PAST_DUE"
+        };
+    } catch (error) {
+        return {
+            ACTIVE: "ACTIVE",
+            EXPIRED: "EXPIRED",
+            CANCELLED: "CANCELLED",
+            PAST_DUE: "PAST_DUE"
+        };
+    }
+})();
 
 // ============================================================================
 // PADDLE WEBHOOK HANDLER
@@ -424,8 +463,8 @@ export async function POST(request: NextRequest) {
                 }
 
                 // Map Paddle status to our status
-                let newStatus: SubscriptionStatus = SubscriptionStatus.ACTIVE;
-                let userSubStatus: SubscriptionStatusType = SubscriptionStatusType.ACTIVE;
+                let newStatus = SubscriptionStatus.ACTIVE;
+                let userSubStatus = SubscriptionStatusType.ACTIVE;
                 
                 if (status === 'canceled') {
                     newStatus = SubscriptionStatus.CANCELLED;
@@ -668,6 +707,16 @@ export async function POST(request: NextRequest) {
         // 6. Mark event as completed (idempotency)
         if (eventId) {
             await completeWebhookEvent(eventId);
+        }
+
+        // 7. Revalidate cache for billing-related pages
+        // This ensures users see updated subscription status immediately
+        try {
+            revalidatePath('/dashboard/billing', 'page');
+            revalidatePath('/dashboard', 'page');
+            revalidatePath('/', 'page');
+        } catch (err) {
+            console.warn('⚠️ Cache revalidation warning:', (err as Error).message);
         }
 
         const duration = Date.now() - startTime;

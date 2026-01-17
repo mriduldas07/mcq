@@ -48,77 +48,90 @@ export const authConfig = {
     async jwt({ token, user, account, profile }) {
       // On first sign-in (when user object exists)
       if (user && account) {
-        // Check if user exists in database
-        let dbUser = await prisma.user.findUnique({
-          where: { email: user.email! },
-          select: {
-            id: true,
-            email: true,
-            name: true,
-            image: true,
-            planType: true,
-            freeExamsUsed: true,
-            oneTimeExamsRemaining: true,
-            provider: true,
-            providerAccountId: true,
-          },
-        });
+        try {
+          // Check if user exists in database
+          let dbUser = await prisma.user.findUnique({
+            where: { email: user.email! },
+            select: {
+              id: true,
+              email: true,
+              name: true,
+              image: true,
+              planType: true,
+              freeExamsUsed: true,
+              oneTimeExamsRemaining: true,
+              provider: true,
+              providerAccountId: true,
+            },
+          });
 
-        // If user doesn't exist, create new user
-        if (!dbUser) {
-          dbUser = await prisma.user.create({
-            data: {
-              email: user.email!,
-              name: user.name || "",
-              image: user.image || null,
-              provider: "google",
-              providerAccountId: account.providerAccountId,
-              planType: "FREE",
-              freeExamsUsed: 0,
-              oneTimeExamsRemaining: 0,
-            },
-            select: {
-              id: true,
-              email: true,
-              name: true,
-              image: true,
-              planType: true,
-              freeExamsUsed: true,
-              oneTimeExamsRemaining: true,
-              provider: true,
-              providerAccountId: true,
-            },
-          });
-        } else {
-          // Update existing user's info (name, image) from Google
-          dbUser = await prisma.user.update({
-            where: { id: dbUser.id },
-            data: {
-              name: user.name || dbUser.name,
-              image: user.image || dbUser.image,
-            },
-            select: {
-              id: true,
-              email: true,
-              name: true,
-              image: true,
-              planType: true,
-              freeExamsUsed: true,
-              oneTimeExamsRemaining: true,
-              provider: true,
-              providerAccountId: true,
-            },
-          });
+          // If user doesn't exist, create new user
+          if (!dbUser) {
+            dbUser = await prisma.user.create({
+              data: {
+                email: user.email!,
+                name: user.name || "",
+                image: user.image || null,
+                provider: "google",
+                providerAccountId: account.providerAccountId,
+                planType: "FREE",
+                freeExamsUsed: 0,
+                oneTimeExamsRemaining: 0,
+              },
+              select: {
+                id: true,
+                email: true,
+                name: true,
+                image: true,
+                planType: true,
+                freeExamsUsed: true,
+                oneTimeExamsRemaining: true,
+                provider: true,
+                providerAccountId: true,
+              },
+            });
+          } else {
+            // Update existing user's info (name, image) from Google
+            dbUser = await prisma.user.update({
+              where: { id: dbUser.id },
+              data: {
+                name: user.name || dbUser.name,
+                image: user.image || dbUser.image,
+              },
+              select: {
+                id: true,
+                email: true,
+                name: true,
+                image: true,
+                planType: true,
+                freeExamsUsed: true,
+                oneTimeExamsRemaining: true,
+                provider: true,
+                providerAccountId: true,
+              },
+            });
+          }
+
+          // Add user data to token
+          token.userId = dbUser.id;
+          token.email = dbUser.email;
+          token.name = dbUser.name;
+          token.picture = dbUser.image;
+          token.planType = dbUser.planType;
+          token.freeExamsUsed = dbUser.freeExamsUsed;
+          token.oneTimeExamsRemaining = dbUser.oneTimeExamsRemaining;
+        } catch (error) {
+          console.error("JWT callback error - database issue:", error);
+          // Return token as-is to prevent complete auth failure
+          // This allows graceful degradation if database is temporarily down
+          if (!token.userId && user?.email) {
+            // If this is first sign-in and DB failed, use basic info from OAuth
+            token.email = user.email;
+            token.name = user.name || "";
+            token.picture = user.image || "";
+            // Will need to create user on next successful DB connection
+          }
         }
-
-        // Add user data to token
-        token.userId = dbUser.id;
-        token.email = dbUser.email;
-        token.name = dbUser.name;
-        token.picture = dbUser.image;
-        token.planType = dbUser.planType;
-        token.freeExamsUsed = dbUser.freeExamsUsed;
-        token.oneTimeExamsRemaining = dbUser.oneTimeExamsRemaining;
       }
 
       return token;

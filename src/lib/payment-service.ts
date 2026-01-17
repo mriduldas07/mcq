@@ -1,5 +1,43 @@
 import { prisma } from "@/lib/prisma";
-import { SubscriptionStatusType, SubscriptionStatus } from "@prisma/client";
+
+// Import enums with fallback for before migration
+const SubscriptionStatusType = (() => {
+    try {
+        const client = require("@prisma/client");
+        return client.SubscriptionStatusType || {
+            NONE: "NONE",
+            ACTIVE: "ACTIVE",
+            CANCELED: "CANCELED",
+            PAST_DUE: "PAST_DUE"
+        };
+    } catch (error) {
+        return {
+            NONE: "NONE",
+            ACTIVE: "ACTIVE",
+            CANCELED: "CANCELED",
+            PAST_DUE: "PAST_DUE"
+        };
+    }
+})();
+
+const SubscriptionStatus = (() => {
+    try {
+        const client = require("@prisma/client");
+        return client.SubscriptionStatus || {
+            ACTIVE: "ACTIVE",
+            EXPIRED: "EXPIRED",
+            CANCELLED: "CANCELLED",
+            PAST_DUE: "PAST_DUE"
+        };
+    } catch (error) {
+        return {
+            ACTIVE: "ACTIVE",
+            EXPIRED: "EXPIRED",
+            CANCELLED: "CANCELLED",
+            PAST_DUE: "PAST_DUE"
+        };
+    }
+})();
 
 /**
  * Payment Service - NEW PRICING MODEL
