@@ -74,13 +74,22 @@ export async function purchaseOneTimeExamAction(): Promise<PaymentResult> {
                 return { error: "Unable to set up payment. Please try again." };
             }
             
-            paddleCustomerId = customerResult.customerId;
-            
-            // Store Paddle customer ID for future use
-            await prisma.user.update({
-                where: { id: user.id },
-                data: { paddleCustomerId },
+            // Attempt to save atomically only if not set (handles concurrency)
+            const updateRes = await prisma.user.updateMany({
+                where: { id: user.id, paddleCustomerId: null },
+                data: { paddleCustomerId: customerResult.customerId },
             });
+
+            if (updateRes.count === 0) {
+                // Another request set it; read the current value
+                const refreshed = await prisma.user.findUnique({
+                    where: { id: user.id },
+                    select: { paddleCustomerId: true },
+                });
+                paddleCustomerId = refreshed?.paddleCustomerId || customerResult.customerId;
+            } else {
+                paddleCustomerId = customerResult.customerId;
+            }
         }
 
         // 5. Create checkout session
@@ -180,13 +189,22 @@ export async function createProSubscriptionAction(
                 return { error: "Unable to set up payment. Please try again." };
             }
             
-            paddleCustomerId = customerResult.customerId;
-            
-            // Store Paddle customer ID
-            await prisma.user.update({
-                where: { id: user.id },
-                data: { paddleCustomerId },
+            // Attempt to save atomically only if not set (handles concurrency)
+            const updateRes = await prisma.user.updateMany({
+                where: { id: user.id, paddleCustomerId: null },
+                data: { paddleCustomerId: customerResult.customerId },
             });
+
+            if (updateRes.count === 0) {
+                // Another request set it; read the current value
+                const refreshed = await prisma.user.findUnique({
+                    where: { id: user.id },
+                    select: { paddleCustomerId: true },
+                });
+                paddleCustomerId = refreshed?.paddleCustomerId || customerResult.customerId;
+            } else {
+                paddleCustomerId = customerResult.customerId;
+            }
         }
 
         // 7. Create checkout session
@@ -513,6 +531,6 @@ export async function getCustomerPortalUrlAction() {
     // Paddle doesn't have a self-service customer portal like Stripe
     // Redirect to our billing page instead
     return {
-        portalUrl: `${process.env.NEXTAUTH_URL || ''}/dashboard/billing`
+        portalUrl: `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/dashboard/billing`
     };
 }

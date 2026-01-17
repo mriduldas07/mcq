@@ -76,32 +76,37 @@ function verifyWebhookSignature(rawBody: string, signature: string): boolean {
 }
 
 /**
- * Check if event has already been processed (idempotency)
+ * Atomically claim a webhook event (idempotency) by inserting a PROCESSING record.
+ * If another process already claimed/completed it, we detect and skip.
  */
-async function isEventProcessed(eventId: string): Promise<boolean> {
-    // Check if we've seen this event before
-    const existing = await prisma.webhookEvent.findUnique({
-        where: { eventId },
-    }).catch(() => null); // Table might not exist yet
-
-    return !!existing;
+async function claimWebhookEvent(eventId: string, eventType: string): Promise<'claimed' | 'exists-processing' | 'exists-completed' | 'skip'> {
+    try {
+        // Attempt to create a PROCESSING record; unique(eventId) prevents duplicates
+        const created = await prisma.webhookEvent.create({
+            data: { eventId, eventType, status: 'PROCESSING' }
+        });
+        if (created) return 'claimed';
+    } catch (error: any) {
+        // If unique constraint violation, fetch existing to check status
+        const existing = await prisma.webhookEvent.findUnique({ where: { eventId } }).catch(() => null);
+        if (!existing) return 'skip';
+        if (existing.status === 'COMPLETED') return 'exists-completed';
+        return 'exists-processing';
+    }
+    return 'skip';
 }
 
 /**
- * Mark event as processed
+ * Mark a previously claimed event as COMPLETED.
  */
-async function markEventProcessed(eventId: string, eventType: string): Promise<void> {
+async function completeWebhookEvent(eventId: string): Promise<void> {
     try {
-        await prisma.webhookEvent.create({
-            data: {
-                eventId,
-                eventType,
-                processedAt: new Date(),
-            },
+        await prisma.webhookEvent.update({
+            where: { eventId },
+            data: { status: 'COMPLETED', processedAt: new Date() }
         });
     } catch (error) {
-        // Ignore if table doesn't exist or duplicate
-        console.warn('Could not mark event as processed:', error);
+        console.warn('Could not mark event as completed:', error);
     }
 }
 
@@ -182,10 +187,21 @@ export async function POST(request: NextRequest) {
 
         console.log(`📥 Paddle webhook: ${eventType} (${eventId})`);
 
-        // 4. Check idempotency (skip if already processed)
-        if (eventId && await isEventProcessed(eventId)) {
-            console.log(`⏭️ Event ${eventId} already processed, skipping`);
-            return NextResponse.json({ received: true, skipped: true });
+        // 4. Idempotency: atomically claim event at start
+        if (eventId) {
+            const claim = await claimWebhookEvent(eventId, eventType);
+            if (claim === 'exists-completed') {
+                console.log(`⏭️ Event ${eventId} already completed, skipping`);
+                return NextResponse.json({ received: true, skipped: true });
+            }
+            if (claim === 'exists-processing') {
+                console.log(`⏭️ Event ${eventId} already being processed, skipping`);
+                return NextResponse.json({ received: true, skipped: true });
+            }
+            if (claim !== 'claimed') {
+                console.log(`⏭️ Event ${eventId} could not be claimed, skipping`);
+                return NextResponse.json({ received: true, skipped: true });
+            }
         }
 
         // 5. Process event based on type
@@ -216,11 +232,11 @@ export async function POST(request: NextRequest) {
                     break;
                 }
 
-                // Update user's Paddle customer ID if not set
-                await prisma.user.update({
-                    where: { id: user.id },
+                // Update user's Paddle customer ID atomically if not set
+                await prisma.user.updateMany({
+                    where: { id: user.id, paddleCustomerId: null },
                     data: { paddleCustomerId: customerId },
-                }).catch(() => {}); // Ignore if already set
+                });
 
                 // Record payment
                 await prisma.payment.create({
@@ -261,11 +277,11 @@ export async function POST(request: NextRequest) {
                     break;
                 }
 
-                // Update user's Paddle customer ID
-                await prisma.user.update({
-                    where: { id: user.id },
+                // Update user's Paddle customer ID atomically if not set
+                await prisma.user.updateMany({
+                    where: { id: user.id, paddleCustomerId: null },
                     data: { paddleCustomerId: customerId },
-                }).catch(() => {});
+                });
 
                 // Determine plan from price ID or custom data
                 const plan = customData?.plan || getPlanFromPriceId(priceId || '');
@@ -280,21 +296,23 @@ export async function POST(request: NextRequest) {
                     await prisma.subscription.update({
                         where: { id: existingSub.id },
                         data: {
-                            status: status === 'active' ? 'ACTIVE' : 'ACTIVE',
-                            currentPeriodStart: new Date(billingPeriod?.starts_at),
-                            currentPeriodEnd: new Date(billingPeriod?.ends_at),
+                            status: status === 'active' ? 'ACTIVE' : status === 'canceled' ? 'CANCELLED' : status === 'past_due' ? 'PAST_DUE' : 'ACTIVE',
+                            currentPeriodStart: billingPeriod?.starts_at ? new Date(billingPeriod.starts_at) : existingSub.currentPeriodStart,
+                            currentPeriodEnd: billingPeriod?.ends_at ? new Date(billingPeriod.ends_at) : existingSub.currentPeriodEnd,
                         },
                     });
                     console.log(`✅ Updated subscription ${subscriptionId} for user ${user.id}`);
                 } else {
                     // Create new subscription
+                    const periodStart = billingPeriod?.starts_at ? new Date(billingPeriod.starts_at) : new Date();
+                    const periodEnd = billingPeriod?.ends_at ? new Date(billingPeriod.ends_at) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
                     await PaymentService.createSubscription(
                         user.id,
                         plan,
                         subscriptionId,
                         customerId,
-                        new Date(billingPeriod?.starts_at || new Date()),
-                        new Date(billingPeriod?.ends_at || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)),
+                        periodStart,
+                        periodEnd,
                         amount
                     );
                     console.log(`✅ Created ${plan} subscription for user ${user.id}`);
@@ -329,19 +347,19 @@ export async function POST(request: NextRequest) {
                     break;
                 }
 
-                // Map Paddle status to our status
+                // Map Paddle status to our status with guards
                 let newStatus: 'ACTIVE' | 'CANCELLED' | 'PAST_DUE' | 'EXPIRED' = 'ACTIVE';
                 if (status === 'canceled') newStatus = 'CANCELLED';
                 else if (status === 'past_due') newStatus = 'PAST_DUE';
                 else if (status === 'paused') newStatus = 'EXPIRED';
 
-                // Update subscription
+                // Update subscription with date guards
                 await prisma.subscription.update({
                     where: { id: subscription.id },
                     data: {
                         status: newStatus,
-                        currentPeriodStart: billingPeriod?.starts_at ? new Date(billingPeriod.starts_at) : undefined,
-                        currentPeriodEnd: billingPeriod?.ends_at ? new Date(billingPeriod.ends_at) : undefined,
+                        currentPeriodStart: billingPeriod?.starts_at ? new Date(billingPeriod.starts_at) : subscription.currentPeriodStart,
+                        currentPeriodEnd: billingPeriod?.ends_at ? new Date(billingPeriod.ends_at) : subscription.currentPeriodEnd,
                         cancelAtPeriodEnd: scheduledChange?.action === 'cancel',
                     },
                 });
@@ -481,9 +499,9 @@ export async function POST(request: NextRequest) {
                 console.log(`ℹ️ Unhandled webhook event: ${eventType}`);
         }
 
-        // 6. Mark event as processed (idempotency)
+        // 6. Mark event as completed (idempotency)
         if (eventId) {
-            await markEventProcessed(eventId, eventType);
+            await completeWebhookEvent(eventId);
         }
 
         const duration = Date.now() - startTime;
@@ -498,11 +516,15 @@ export async function POST(request: NextRequest) {
     } catch (error) {
         console.error('❌ Webhook processing error:', error);
         
-        // Return 200 to prevent Paddle from retrying (we logged the error)
-        // In production, you might want to return 500 for retriable errors
+        // Classify retriable vs. non-retriable errors
+        const msg = (error as Error).message || '';
+        const isPrismaConn = msg.includes('P1001') || msg.includes('Connection') || msg.includes('timeout');
+        const isNetwork = msg.includes('fetch failed') || msg.includes('ECONN') || msg.includes('ENET');
+        const shouldRetry = isPrismaConn || isNetwork;
+
         return NextResponse.json(
-            { error: 'Webhook processing failed', message: (error as Error).message },
-            { status: 200 } // Return 200 to acknowledge receipt
+            { error: 'Webhook processing failed', message: msg },
+            { status: shouldRetry ? 500 : 200 }
         );
     }
 }

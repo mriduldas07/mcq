@@ -335,11 +335,19 @@ enum IntegrityEventType {
 
 // Webhook event tracking for idempotency
 model WebhookEvent {
-  id          String   @id @default(cuid())
-  eventId     String   @unique // Paddle event ID
-  eventType   String   // Event type (e.g., transaction.completed)
-  processedAt DateTime @default(now())
+  id          String              @id @default(cuid())
+  eventId     String              @unique // Paddle event ID
+  eventType   String              // Event type (e.g., transaction.completed)
+  status      WebhookEventStatus  @default(PROCESSING)
+  createdAt   DateTime            @default(now())
+  processedAt DateTime?
 
   @@index([eventId])
-  @@index([processedAt])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum WebhookEventStatus {
+  PROCESSING
+  COMPLETED
 }

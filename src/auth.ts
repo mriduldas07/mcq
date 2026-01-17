@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import { PrismaClient } from "@prisma/client";
 import type { NextAuthConfig } from "next-auth";
+import { revalidatePath } from "next/cache";
 
 const prisma = new PrismaClient();
 
@@ -21,6 +22,20 @@ export const authConfig = {
   ],
   pages: {
     signIn: "/login",
+  },
+  events: {
+    async signIn() {
+      // Revalidate session-dependent pages after login
+      revalidatePath("/");
+      revalidatePath("/dashboard");
+      revalidatePath("/dashboard/billing");
+    },
+    async signOut() {
+      // Revalidate pages after logout to avoid stale PRO state
+      revalidatePath("/");
+      revalidatePath("/dashboard");
+      revalidatePath("/dashboard/billing");
+    },
   },
   callbacks: {
     async signIn({ user, account, profile }) {
@@ -130,8 +145,8 @@ export const authConfig = {
   trustHost: true,
   cookies: {
     sessionToken: {
-      name: process.env.NODE_ENV === "production" 
-        ? "__Secure-authjs.session-token" 
+      name: process.env.NODE_ENV === "production"
+        ? "__Secure-authjs.session-token"
         : "authjs.session-token",
       options: {
         httpOnly: true,

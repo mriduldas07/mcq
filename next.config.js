@@ -7,9 +7,8 @@ const nextConfig = {
     "*.ngrok-free.dev",
   ],
   
-  // Disable React Strict Mode to prevent double rendering in development
-  // This reduces the "too many renders" issue during dev
-  reactStrictMode: false,
+  // Enable React Strict Mode; fix components to avoid side effects during render
+  reactStrictMode: true,
   
   // Optimize for production
   poweredByHeader: false,
