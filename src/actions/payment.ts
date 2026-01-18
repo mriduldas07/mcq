@@ -536,6 +536,79 @@ export async function getUserBillingStatusAction() {
 }
 
 // ============================================================================
+// POLL FOR PAYMENT STATUS (Vercel-friendly - no revalidatePath dependency)
+// ============================================================================
+
+/**
+ * Poll for updated user billing status
+ * This is designed for client-side polling after checkout completion
+ * Works on Vercel where webhook revalidatePath doesn't reach the client
+ * 
+ * Returns fresh data directly from DB, bypassing any cache
+ */
+export async function pollBillingStatusAction(): Promise<{
+    success: boolean;
+    data?: {
+        planType: string;
+        subscriptionStatus: string;
+        isPro: boolean;
+        oneTimeExamsRemaining: number;
+        freeExamsUsed: number;
+        currentPeriodEnd: Date | null;
+        hasActiveSubscription: boolean;
+    };
+    error?: string;
+}> {
+    try {
+        const session = await verifySession();
+        if (!session) {
+            return { success: false, error: "Unauthorized" };
+        }
+
+        // Fetch fresh data directly from database (no cache)
+        const user = await prisma.user.findUnique({
+            where: { id: session.userId },
+            select: {
+                planType: true,
+                subscriptionStatus: true,
+                oneTimeExamsRemaining: true,
+                freeExamsUsed: true,
+                currentPeriodEnd: true,
+                subscriptions: {
+                    where: { status: SubscriptionStatus.ACTIVE },
+                    orderBy: { currentPeriodEnd: 'desc' },
+                    take: 1,
+                    select: { id: true, status: true, currentPeriodEnd: true },
+                },
+            },
+        });
+
+        if (!user) {
+            return { success: false, error: "User not found" };
+        }
+
+        const hasActiveSubscription = user.subscriptions.length > 0;
+        const isPro = user.planType === 'PRO' || hasActiveSubscription;
+
+        return {
+            success: true,
+            data: {
+                planType: user.planType,
+                subscriptionStatus: user.subscriptionStatus,
+                isPro,
+                oneTimeExamsRemaining: user.oneTimeExamsRemaining,
+                freeExamsUsed: user.freeExamsUsed,
+                currentPeriodEnd: user.currentPeriodEnd,
+                hasActiveSubscription,
+            },
+        };
+    } catch (error: any) {
+        console.error("Poll billing status error:", error);
+        return { success: false, error: "Failed to fetch billing status" };
+    }
+}
+
+// ============================================================================
 // DEPRECATED ACTIONS (kept for backward compatibility)
 // ============================================================================
 

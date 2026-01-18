@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useTransition, useEffect, useCallback } from "react";
+import { useState, useTransition, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Check, Sparkles, Loader2, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
-import { purchaseOneTimeExamAction, createProSubscriptionAction, cancelSubscriptionAction } from "@/actions/payment";
+import { purchaseOneTimeExamAction, createProSubscriptionAction, cancelSubscriptionAction, pollBillingStatusAction } from "@/actions/payment";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
@@ -75,10 +75,81 @@ type LoadingState = 'one-time' | 'MONTHLY' | 'YEARLY' | 'cancel' | null;
 
 // Paddle types are declared globally in paddle-checkout-handler.tsx
 
-function usePaddleJs() {
+/**
+ * Poll for billing status updates after checkout
+ * This is Vercel-friendly - doesn't rely on revalidatePath from webhooks
+ * Polls the database directly until status changes or max attempts reached
+ */
+async function pollForBillingUpdate(
+    expectedChange: 'subscription' | 'exam',
+    initialIsPro: boolean,
+    initialExamCredits: number,
+    onSuccess: () => void,
+    onTimeout: () => void,
+    maxAttempts: number = 20,
+    intervalMs: number = 1500
+): Promise<void> {
+    let attempts = 0;
+    
+    const poll = async () => {
+        attempts++;
+        console.log(`🔄 Polling for billing update (attempt ${attempts}/${maxAttempts})...`);
+        
+        try {
+            const result = await pollBillingStatusAction();
+            
+            if (result.success && result.data) {
+                const { isPro, oneTimeExamsRemaining } = result.data;
+                
+                // Check if the expected change happened
+                if (expectedChange === 'subscription' && isPro && !initialIsPro) {
+                    console.log('✅ Subscription activated detected!');
+                    onSuccess();
+                    return;
+                }
+                
+                if (expectedChange === 'exam' && oneTimeExamsRemaining > initialExamCredits) {
+                    console.log('✅ Exam credit added detected!');
+                    onSuccess();
+                    return;
+                }
+            }
+            
+            // Continue polling if max attempts not reached
+            if (attempts < maxAttempts) {
+                setTimeout(poll, intervalMs);
+            } else {
+                console.log('⏰ Polling timeout - redirecting anyway');
+                onTimeout();
+            }
+        } catch (error) {
+            console.error('Polling error:', error);
+            if (attempts < maxAttempts) {
+                setTimeout(poll, intervalMs);
+            } else {
+                onTimeout();
+            }
+        }
+    };
+    
+    // Start polling after a short delay to give webhook time to process
+    setTimeout(poll, 1000);
+}
+
+function usePaddleJs(currentIsPro: boolean, currentExamCredits: number) {
     const [isLoaded, setIsLoaded] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [isPolling, setIsPolling] = useState(false);
     const router = useRouter();
+    
+    // Use refs to access current values in callback without stale closures
+    const isProRef = useRef(currentIsPro);
+    const examCreditsRef = useRef(currentExamCredits);
+    
+    useEffect(() => {
+        isProRef.current = currentIsPro;
+        examCreditsRef.current = currentExamCredits;
+    }, [currentIsPro, currentExamCredits]);
 
     useEffect(() => {
         const clientToken = process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN;
@@ -113,10 +184,39 @@ function usePaddleJs() {
                             switch (event.name) {
                                 case 'checkout.completed':
                                     toast.success('Payment successful! Updating your account...');
-                                    // Wait for webhook to process, then redirect
-                                    setTimeout(() => {
-                                        window.location.href = '/dashboard/billing?success=true';
-                                    }, 3000);
+                                    setIsPolling(true);
+                                    
+                                    // Determine what type of purchase was made
+                                    const checkoutData = event.data;
+                                    const isSubscription = checkoutData?.items?.some((item: any) => 
+                                        item.price?.billing_cycle || 
+                                        item.price?.id?.includes('pro') ||
+                                        item.recurring
+                                    ) ?? true; // Default to subscription if can't determine
+                                    
+                                    const purchaseType = isSubscription ? 'subscription' : 'exam';
+                                    
+                                    // Poll for the update (Vercel-friendly approach)
+                                    pollForBillingUpdate(
+                                        purchaseType,
+                                        isProRef.current,
+                                        examCreditsRef.current,
+                                        () => {
+                                            // Success - update detected
+                                            setIsPolling(false);
+                                            toast.success('Account updated successfully!');
+                                            // Force a full page refresh to get fresh server data
+                                            window.location.href = `/dashboard/billing?success=true&type=${purchaseType}`;
+                                        },
+                                        () => {
+                                            // Timeout - redirect anyway (webhook might be slow)
+                                            setIsPolling(false);
+                                            toast.info('Payment received! Your account will update shortly.');
+                                            window.location.href = `/dashboard/billing?success=true&type=${purchaseType}&pending=true`;
+                                        },
+                                        20, // max 20 attempts
+                                        1500 // 1.5 seconds between attempts (total ~30 seconds)
+                                    );
                                     break;
 
                                 case 'checkout.closed':
@@ -162,7 +262,7 @@ function usePaddleJs() {
         };
     }, [router]);
 
-    return { isLoaded, error };
+    return { isLoaded, error, isPolling };
 }
 
 // ============================================================================
@@ -212,6 +312,48 @@ function CancelBanner() {
 }
 
 // ============================================================================
+// POLLING/PENDING BANNER COMPONENT
+// ============================================================================
+
+function PollingBanner() {
+    return (
+        <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg flex items-center gap-3">
+            <Loader2 className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0 animate-spin" />
+            <div>
+                <p className="font-medium text-blue-800 dark:text-blue-200">Processing your payment...</p>
+                <p className="text-sm text-blue-600 dark:text-blue-400">
+                    Please wait while we update your account. This usually takes a few seconds.
+                </p>
+            </div>
+        </div>
+    );
+}
+
+function PendingBanner() {
+    const router = useRouter();
+    
+    // Auto-refresh after 5 seconds to check if webhook has processed
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            router.refresh();
+        }, 5000);
+        return () => clearTimeout(timer);
+    }, [router]);
+    
+    return (
+        <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg flex items-center gap-3">
+            <Loader2 className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0 animate-spin" />
+            <div>
+                <p className="font-medium text-blue-800 dark:text-blue-200">Payment received!</p>
+                <p className="text-sm text-blue-600 dark:text-blue-400">
+                    Your account is being updated. This page will refresh automatically...
+                </p>
+            </div>
+        </div>
+    );
+}
+
+// ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
@@ -227,11 +369,12 @@ export function BillingClient({
     const searchParams = useSearchParams();
     const [isPending, startTransition] = useTransition();
     const [loadingState, setLoadingState] = useState<LoadingState>(null);
-    const { isLoaded: paddleLoaded, error: paddleError } = usePaddleJs();
+    const { isLoaded: paddleLoaded, error: paddleError, isPolling } = usePaddleJs(isPro, oneTimeExamsRemaining);
 
     // Check for success/cancel URL params
     const isSuccess = searchParams.get('success') === 'true';
     const isCancelled = searchParams.get('cancelled') === 'true';
+    const isPending_url = searchParams.get('pending') === 'true';
     const purchaseType = searchParams.get('type');
     const planType = searchParams.get('plan');
 
@@ -402,8 +545,10 @@ export function BillingClient({
 
     return (
         <div className="flex-1 space-y-4 p-4 pt-6">
-            {/* Success/Cancel Banners */}
-            {isSuccess && <SuccessBanner type={purchaseType || 'payment'} plan={planType || undefined} />}
+            {/* Polling/Pending/Success/Cancel Banners */}
+            {isPolling && <PollingBanner />}
+            {isPending_url && !isPolling && <PendingBanner />}
+            {isSuccess && !isPending_url && !isPolling && <SuccessBanner type={purchaseType || 'payment'} plan={planType || undefined} />}
             {isCancelled && <CancelBanner />}
 
             {/* Paddle Error Banner */}

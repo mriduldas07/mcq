@@ -2,7 +2,7 @@ import { DashboardNav } from "@/components/dashboard-nav";
 import { MobileNav } from "@/components/mobile-nav";
 import { UserAccountNav } from "@/components/user-account-nav";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { verifySession } from "@/lib/session";
+import { verifySessionWithDbCheck } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import Link from "next/link";
@@ -12,12 +12,14 @@ export default async function DashboardLayout({
 }: {
     children: React.ReactNode;
 }) {
-    const session = await verifySession();
+    // This validates session AND checks if user exists in DB
+    // If user doesn't exist (e.g., after DB reset), it automatically signs out
+    const session = await verifySessionWithDbCheck();
     if (!session) {
         redirect("/login");
     }
 
-    // Fetch user data
+    // Fetch full user data (we already know user exists from verifySessionWithDbCheck)
     const user = await prisma.user.findUnique({
         where: { id: session.userId },
         select: {
@@ -31,6 +33,8 @@ export default async function DashboardLayout({
     });
 
     if (!user) {
+        // This shouldn't happen since verifySessionWithDbCheck already validated
+        // But just in case, redirect to login
         redirect("/login");
     }
 
