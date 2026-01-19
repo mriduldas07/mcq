@@ -587,8 +587,9 @@ export async function pollBillingStatusAction(): Promise<{
             return { success: false, error: "User not found" };
         }
 
-        const hasActiveSubscription = user.subscriptions.length > 0;
-        const isPro = user.planType === 'PRO' || hasActiveSubscription;
+        // Mirror getUserBillingStatusAction: check for active subscription with valid currentPeriodEnd
+        const activeSubscription = user.subscriptions[0] || null;
+        const isPro = activeSubscription && new Date() <= activeSubscription.currentPeriodEnd;
 
         return {
             success: true,
@@ -599,7 +600,7 @@ export async function pollBillingStatusAction(): Promise<{
                 oneTimeExamsRemaining: user.oneTimeExamsRemaining,
                 freeExamsUsed: user.freeExamsUsed,
                 currentPeriodEnd: user.currentPeriodEnd,
-                hasActiveSubscription,
+                hasActiveSubscription: !!activeSubscription,
             },
         };
     } catch (error: any) {

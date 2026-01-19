@@ -39,6 +39,16 @@ const SubscriptionStatusType = (() => {
 })();
 
 // ============================================================================
+// CONSTANTS
+// ============================================================================
+
+// Known subscription price IDs - maintain this list to match your Paddle products
+const SUBSCRIPTION_PRICE_IDS = new Set([
+    process.env.NEXT_PUBLIC_PADDLE_PRICE_ID_PRO_MONTHLY || '',
+    process.env.NEXT_PUBLIC_PADDLE_PRICE_ID_PRO_YEARLY || '',
+].filter(Boolean));
+
+// ============================================================================
 // TYPES
 // ============================================================================
 
@@ -87,16 +97,45 @@ async function pollForBillingUpdate(
     onSuccess: () => void,
     onTimeout: () => void,
     maxAttempts: number = 20,
-    intervalMs: number = 1500
+    intervalMs: number = 1500,
+    signal?: AbortSignal
 ): Promise<void> {
     let attempts = 0;
+    let timeoutId: NodeJS.Timeout | null = null;
+    
+    // Clear timeout and exit if aborted
+    const cleanup = () => {
+        if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+        }
+    };
+    
+    // Listen for abort signal
+    if (signal) {
+        signal.addEventListener('abort', cleanup);
+    }
     
     const poll = async () => {
+        // Check if aborted before polling
+        if (signal?.aborted) {
+            console.log('🛑 Polling aborted');
+            cleanup();
+            return;
+        }
+        
         attempts++;
         console.log(`🔄 Polling for billing update (attempt ${attempts}/${maxAttempts})...`);
         
         try {
             const result = await pollBillingStatusAction();
+            
+            // Check if aborted after async operation
+            if (signal?.aborted) {
+                console.log('🛑 Polling aborted');
+                cleanup();
+                return;
+            }
             
             if (result.success && result.data) {
                 const { isPro, oneTimeExamsRemaining } = result.data;
@@ -104,36 +143,50 @@ async function pollForBillingUpdate(
                 // Check if the expected change happened
                 if (expectedChange === 'subscription' && isPro && !initialIsPro) {
                     console.log('✅ Subscription activated detected!');
+                    cleanup();
                     onSuccess();
                     return;
                 }
                 
                 if (expectedChange === 'exam' && oneTimeExamsRemaining > initialExamCredits) {
                     console.log('✅ Exam credit added detected!');
+                    cleanup();
                     onSuccess();
                     return;
                 }
             }
             
-            // Continue polling if max attempts not reached
-            if (attempts < maxAttempts) {
-                setTimeout(poll, intervalMs);
-            } else {
+            // Continue polling if max attempts not reached and not aborted
+            if (attempts < maxAttempts && !signal?.aborted) {
+                timeoutId = setTimeout(poll, intervalMs);
+            } else if (attempts >= maxAttempts) {
                 console.log('⏰ Polling timeout - redirecting anyway');
+                cleanup();
                 onTimeout();
             }
         } catch (error) {
             console.error('Polling error:', error);
-            if (attempts < maxAttempts) {
-                setTimeout(poll, intervalMs);
-            } else {
+            
+            // Check if aborted after error
+            if (signal?.aborted) {
+                console.log('🛑 Polling aborted');
+                cleanup();
+                return;
+            }
+            
+            if (attempts < maxAttempts && !signal?.aborted) {
+                timeoutId = setTimeout(poll, intervalMs);
+            } else if (attempts >= maxAttempts) {
+                cleanup();
                 onTimeout();
             }
         }
     };
     
     // Start polling after a short delay to give webhook time to process
-    setTimeout(poll, 1000);
+    if (!signal?.aborted) {
+        timeoutId = setTimeout(poll, 1000);
+    }
 }
 
 function usePaddleJs(currentIsPro: boolean, currentExamCredits: number) {
@@ -154,6 +207,9 @@ function usePaddleJs(currentIsPro: boolean, currentExamCredits: number) {
     useEffect(() => {
         const clientToken = process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN;
         const environment = process.env.NEXT_PUBLIC_PADDLE_ENVIRONMENT || 'sandbox';
+        
+        // Create AbortController for cleanup on unmount
+        const abortController = new AbortController();
 
         if (!clientToken) {
             console.warn('Paddle client token not configured');
@@ -186,15 +242,46 @@ function usePaddleJs(currentIsPro: boolean, currentExamCredits: number) {
                                     toast.success('Payment successful! Updating your account...');
                                     setIsPolling(true);
                                     
-                                    // Determine what type of purchase was made
+                                    // Determine what type of purchase was made using reliable detection
                                     const checkoutData = event.data;
-                                    const isSubscription = checkoutData?.items?.some((item: any) => 
-                                        item.price?.billing_cycle || 
-                                        item.price?.id?.includes('pro') ||
-                                        item.recurring
-                                    ) ?? true; // Default to subscription if can't determine
                                     
+                                    // Method 1: Check metadata (seller-controlled, most reliable)
+                                    let isSubscription = checkoutData?.metadata?.is_subscription === 'true' || 
+                                                        checkoutData?.metadata?.is_subscription === true;
+                                    
+                                    // Method 2: Check against known subscription price IDs
+                                    if (isSubscription === undefined || isSubscription === null) {
+                                        isSubscription = checkoutData?.items?.some((item: any) => {
+                                            const priceId = item.price?.id;
+                                            return priceId && SUBSCRIPTION_PRICE_IDS.has(priceId);
+                                        }) ?? false;
+                                    }
+                                    
+                                    // Method 3: Fallback to billing_cycle check (less reliable)
+                                    if (!isSubscription && checkoutData?.items) {
+                                        const hasBillingCycle = checkoutData.items.some((item: any) => 
+                                            item.price?.billing_cycle?.interval || item.recurring?.billing_period
+                                        );
+                                        if (hasBillingCycle) {
+                                            isSubscription = true;
+                                            console.warn('⚠️ Subscription detected via billing_cycle fallback. Consider adding metadata or price ID mapping.');
+                                        }
+                                    }
+                                    
+                                    // Log detection failures for monitoring
+                                    if (!isSubscription && !checkoutData?.items?.length) {
+                                        console.error('❌ Unable to determine purchase type: no items in checkout data', {
+                                            checkoutData,
+                                            metadata: checkoutData?.metadata,
+                                        });
+                                    }
+                                    
+                                    // Default to false (one-time purchase) for unknown types
                                     const purchaseType = isSubscription ? 'subscription' : 'exam';
+                                    console.log(`✅ Purchase type detected: ${purchaseType}`, { 
+                                        metadata: checkoutData?.metadata,
+                                        priceIds: checkoutData?.items?.map((i: any) => i.price?.id),
+                                    });
                                     
                                     // Poll for the update (Vercel-friendly approach)
                                     pollForBillingUpdate(
@@ -215,7 +302,8 @@ function usePaddleJs(currentIsPro: boolean, currentExamCredits: number) {
                                             window.location.href = `/dashboard/billing?success=true&type=${purchaseType}&pending=true`;
                                         },
                                         20, // max 20 attempts
-                                        1500 // 1.5 seconds between attempts (total ~30 seconds)
+                                        1500, // 1.5 seconds between attempts (total ~30 seconds)
+                                        abortController.signal // Pass abort signal for cleanup
                                     );
                                     break;
 
@@ -258,7 +346,8 @@ function usePaddleJs(currentIsPro: boolean, currentExamCredits: number) {
         document.body.appendChild(script);
 
         return () => {
-            // Cleanup not needed - Paddle should persist
+            // Abort any ongoing polling to prevent memory leaks
+            abortController.abort();
         };
     }, [router]);
 
