@@ -103,11 +103,15 @@ async function pollForBillingUpdate(
     let attempts = 0;
     let timeoutId: NodeJS.Timeout | null = null;
     
-    // Clear timeout and exit if aborted
+    // Clear timeout and remove event listener
     const cleanup = () => {
         if (timeoutId) {
             clearTimeout(timeoutId);
             timeoutId = null;
+        }
+        // Remove abort listener to prevent memory leak
+        if (signal) {
+            signal.removeEventListener('abort', cleanup);
         }
     };
     
@@ -245,12 +249,17 @@ function usePaddleJs(currentIsPro: boolean, currentExamCredits: number) {
                                     // Determine what type of purchase was made using reliable detection
                                     const checkoutData = event.data;
                                     
-                                    // Method 1: Check metadata (seller-controlled, most reliable)
-                                    let isSubscription = checkoutData?.metadata?.is_subscription === 'true' || 
-                                                        checkoutData?.metadata?.is_subscription === true;
+                                    let isSubscription: boolean;
                                     
-                                    // Method 2: Check against known subscription price IDs
-                                    if (isSubscription === undefined || isSubscription === null) {
+                                    // Method 1: Check metadata (seller-controlled, most reliable)
+                                    if (checkoutData?.metadata && 
+                                        (checkoutData.metadata.is_subscription !== undefined && 
+                                         checkoutData.metadata.is_subscription !== null)) {
+                                        // Metadata present - use it
+                                        isSubscription = checkoutData.metadata.is_subscription === 'true' || 
+                                                        checkoutData.metadata.is_subscription === true;
+                                    } else {
+                                        // Method 2: Check against known subscription price IDs
                                         isSubscription = checkoutData?.items?.some((item: any) => {
                                             const priceId = item.price?.id;
                                             return priceId && SUBSCRIPTION_PRICE_IDS.has(priceId);

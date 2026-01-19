@@ -4,8 +4,13 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
-export default function LoginPage() {
+function LoginContent() {
+    const searchParams = useSearchParams();
+    const sessionExpired = searchParams.get("session_expired") === "true";
+    
     return (
         <div className="min-h-screen max-w-full overflow-x-hidden flex flex-col">
             {/* Simple Header */}
@@ -42,6 +47,15 @@ export default function LoginPage() {
                             <div className="h-2 bg-linear-to-r from-blue-600 via-purple-600 to-pink-600" />
                             
                             <div className="p-8 sm:p-10 space-y-6">
+                                {/* Session Expired Banner */}
+                                {sessionExpired && (
+                                    <div className="p-3 bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 rounded-xl">
+                                        <p className="text-sm text-amber-800 dark:text-amber-200 text-center">
+                                            Your session has expired. Please sign in again.
+                                        </p>
+                                    </div>
+                                )}
+
                                 {/* Header */}
                                 <div className="text-center space-y-3">
                                     <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-linear-to-br from-blue-600 via-purple-600 to-pink-600 shadow-xl mb-2">
@@ -159,5 +173,14 @@ export default function LoginPage() {
                 }
             `}</style>
         </div>
+    );
+}
+
+// Export the page with Suspense wrapper (required for useSearchParams)
+export default function LoginPage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+            <LoginContent />
+        </Suspense>
     );
 }

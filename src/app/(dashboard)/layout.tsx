@@ -13,11 +13,22 @@ export default async function DashboardLayout({
     children: React.ReactNode;
 }) {
     // This validates session AND checks if user exists in DB
-    // If user doesn't exist (e.g., after DB reset), it automatically signs out
-    const session = await verifySessionWithDbCheck();
-    if (!session) {
+    const sessionResult = await verifySessionWithDbCheck();
+    
+    // Handle different session states
+    if (sessionResult.status === "no_session") {
+        // Not logged in - redirect to login
         redirect("/login");
     }
+    
+    if (sessionResult.status === "invalid_session") {
+        // Session exists but user not in DB (e.g., after DB reset)
+        // Redirect to force sign-out route which will clear cookies and redirect to login
+        redirect("/api/auth/force-signout");
+    }
+    
+    // Session is valid
+    const session = sessionResult.session;
 
     // Fetch full user data (we already know user exists from verifySessionWithDbCheck)
     const user = await prisma.user.findUnique({
@@ -34,8 +45,8 @@ export default async function DashboardLayout({
 
     if (!user) {
         // This shouldn't happen since verifySessionWithDbCheck already validated
-        // But just in case, redirect to login
-        redirect("/login");
+        // But just in case, redirect to force sign-out
+        redirect("/api/auth/force-signout");
     }
 
     return (

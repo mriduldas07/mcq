@@ -1,5 +1,5 @@
 import "server-only";
-import { auth, signOut } from "@/auth";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
 export type SessionUser = {
@@ -11,6 +11,12 @@ export type SessionUser = {
     freeExamsUsed: number;
     oneTimeExamsRemaining: number;
 };
+
+// Special result type for session validation with DB check
+export type SessionCheckResult = 
+    | { status: "valid"; session: SessionUser }
+    | { status: "no_session" }
+    | { status: "invalid_session" }; // Session exists but user not in DB
 
 /**
  * Get current session (NextAuth wrapper)
@@ -36,16 +42,19 @@ export async function verifySession(): Promise<SessionUser | null> {
 
 /**
  * Verify session AND validate user exists in database
- * If session exists but user doesn't exist in DB (e.g., after DB reset),
- * this will sign out the user and return null
+ * Returns a result object indicating the session status:
+ * - "valid": Session is valid and user exists in DB
+ * - "no_session": No session exists (not logged in)
+ * - "invalid_session": Session exists but user not in DB (needs force sign-out)
  * 
- * Use this for protected pages that need to ensure the user is valid
+ * Use this for protected pages that need to ensure the user is valid.
+ * The calling code should redirect to /api/auth/force-signout for "invalid_session"
  */
-export async function verifySessionWithDbCheck(): Promise<SessionUser | null> {
+export async function verifySessionWithDbCheck(): Promise<SessionCheckResult> {
     const session = await verifySession();
     
     if (!session) {
-        return null;
+        return { status: "no_session" };
     }
 
     try {
@@ -57,33 +66,15 @@ export async function verifySessionWithDbCheck(): Promise<SessionUser | null> {
 
         if (!dbUser) {
             // User doesn't exist in DB - session is stale/invalid
-            // Sign out to clear the invalid cookies
-            console.warn(`Session user ${session.userId} not found in database. Signing out.`);
-            await forceSignOut();
-            return null;
+            console.warn(`Session user ${session.userId} not found in database. Session is invalid.`);
+            return { status: "invalid_session" };
         }
 
-        return session;
+        return { status: "valid", session };
     } catch (error) {
         console.error("Database check failed during session verification:", error);
-        // If DB is completely down, we might want to allow the session to continue
-        // But if it's a "user not found" scenario after DB reset, sign out
-        // For safety, sign out on any DB error related to user lookup
-        await forceSignOut();
-        return null;
-    }
-}
-
-/**
- * Force sign out the current user (clears cookies and session)
- * Used when session is invalid or user no longer exists
- */
-export async function forceSignOut(): Promise<void> {
-    try {
-        await signOut({ redirect: false });
-    } catch (error) {
-        // Ignore errors during sign out - we just want to clear the session
-        console.error("Error during force sign out:", error);
+        // For safety, treat DB errors as invalid session
+        return { status: "invalid_session" };
     }
 }
 
