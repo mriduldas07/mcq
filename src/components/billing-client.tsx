@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useTransition, useEffect, useCallback, useRef } from "react";
+import { useState, useTransition, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Check, Sparkles, Loader2, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
-import { purchaseOneTimeExamAction, createProSubscriptionAction, cancelSubscriptionAction, pollBillingStatusAction } from "@/actions/payment";
+import { purchaseOneTimeExamAction, createProSubscriptionAction, cancelSubscriptionAction } from "@/actions/payment";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
@@ -85,135 +85,16 @@ type LoadingState = 'one-time' | 'MONTHLY' | 'YEARLY' | 'cancel' | null;
 
 // Paddle types are declared globally in paddle-checkout-handler.tsx
 
-/**
- * Poll for billing status updates after checkout
- * This is Vercel-friendly - doesn't rely on revalidatePath from webhooks
- * Polls the database directly until status changes or max attempts reached
- */
-async function pollForBillingUpdate(
-    expectedChange: 'subscription' | 'exam',
-    initialIsPro: boolean,
-    initialExamCredits: number,
-    onSuccess: () => void,
-    onTimeout: () => void,
-    maxAttempts: number = 20,
-    intervalMs: number = 1500,
-    signal?: AbortSignal
-): Promise<void> {
-    let attempts = 0;
-    let timeoutId: NodeJS.Timeout | null = null;
-    
-    // Clear timeout and remove event listener
-    const cleanup = () => {
-        if (timeoutId) {
-            clearTimeout(timeoutId);
-            timeoutId = null;
-        }
-        // Remove abort listener to prevent memory leak
-        if (signal) {
-            signal.removeEventListener('abort', cleanup);
-        }
-    };
-    
-    // Listen for abort signal
-    if (signal) {
-        signal.addEventListener('abort', cleanup);
-    }
-    
-    const poll = async () => {
-        // Check if aborted before polling
-        if (signal?.aborted) {
-            console.log('🛑 Polling aborted');
-            cleanup();
-            return;
-        }
-        
-        attempts++;
-        console.log(`🔄 Polling for billing update (attempt ${attempts}/${maxAttempts})...`);
-        
-        try {
-            const result = await pollBillingStatusAction();
-            
-            // Check if aborted after async operation
-            if (signal?.aborted) {
-                console.log('🛑 Polling aborted');
-                cleanup();
-                return;
-            }
-            
-            if (result.success && result.data) {
-                const { isPro, oneTimeExamsRemaining } = result.data;
-                
-                // Check if the expected change happened
-                if (expectedChange === 'subscription' && isPro && !initialIsPro) {
-                    console.log('✅ Subscription activated detected!');
-                    cleanup();
-                    onSuccess();
-                    return;
-                }
-                
-                if (expectedChange === 'exam' && oneTimeExamsRemaining > initialExamCredits) {
-                    console.log('✅ Exam credit added detected!');
-                    cleanup();
-                    onSuccess();
-                    return;
-                }
-            }
-            
-            // Continue polling if max attempts not reached and not aborted
-            if (attempts < maxAttempts && !signal?.aborted) {
-                timeoutId = setTimeout(poll, intervalMs);
-            } else if (attempts >= maxAttempts) {
-                console.log('⏰ Polling timeout - redirecting anyway');
-                cleanup();
-                onTimeout();
-            }
-        } catch (error) {
-            console.error('Polling error:', error);
-            
-            // Check if aborted after error
-            if (signal?.aborted) {
-                console.log('🛑 Polling aborted');
-                cleanup();
-                return;
-            }
-            
-            if (attempts < maxAttempts && !signal?.aborted) {
-                timeoutId = setTimeout(poll, intervalMs);
-            } else if (attempts >= maxAttempts) {
-                cleanup();
-                onTimeout();
-            }
-        }
-    };
-    
-    // Start polling after a short delay to give webhook time to process
-    if (!signal?.aborted) {
-        timeoutId = setTimeout(poll, 1000);
-    }
-}
+// Polling removed - using immediate redirect approach instead
+// The billing page will handle showing "processing" state if webhook hasn't completed yet
 
-function usePaddleJs(currentIsPro: boolean, currentExamCredits: number) {
+function usePaddleJs() {
     const [isLoaded, setIsLoaded] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [isPolling, setIsPolling] = useState(false);
-    const router = useRouter();
-    
-    // Use refs to access current values in callback without stale closures
-    const isProRef = useRef(currentIsPro);
-    const examCreditsRef = useRef(currentExamCredits);
-    
-    useEffect(() => {
-        isProRef.current = currentIsPro;
-        examCreditsRef.current = currentExamCredits;
-    }, [currentIsPro, currentExamCredits]);
 
     useEffect(() => {
         const clientToken = process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN;
         const environment = process.env.NEXT_PUBLIC_PADDLE_ENVIRONMENT || 'sandbox';
-        
-        // Create AbortController for cleanup on unmount
-        const abortController = new AbortController();
 
         if (!clientToken) {
             console.warn('Paddle client token not configured');
@@ -243,9 +124,6 @@ function usePaddleJs(currentIsPro: boolean, currentExamCredits: number) {
 
                             switch (event.name) {
                                 case 'checkout.completed':
-                                    toast.success('Payment successful! Updating your account...');
-                                    setIsPolling(true);
-                                    
                                     // Determine what type of purchase was made using reliable detection
                                     const checkoutData = event.data;
                                     
@@ -255,7 +133,6 @@ function usePaddleJs(currentIsPro: boolean, currentExamCredits: number) {
                                     if (checkoutData?.metadata && 
                                         (checkoutData.metadata.is_subscription !== undefined && 
                                          checkoutData.metadata.is_subscription !== null)) {
-                                        // Metadata present - use it
                                         isSubscription = checkoutData.metadata.is_subscription === 'true' || 
                                                         checkoutData.metadata.is_subscription === true;
                                     } else {
@@ -273,47 +150,20 @@ function usePaddleJs(currentIsPro: boolean, currentExamCredits: number) {
                                         );
                                         if (hasBillingCycle) {
                                             isSubscription = true;
-                                            console.warn('⚠️ Subscription detected via billing_cycle fallback. Consider adding metadata or price ID mapping.');
                                         }
                                     }
                                     
-                                    // Log detection failures for monitoring
-                                    if (!isSubscription && !checkoutData?.items?.length) {
-                                        console.error('❌ Unable to determine purchase type: no items in checkout data', {
-                                            checkoutData,
-                                            metadata: checkoutData?.metadata,
-                                        });
-                                    }
-                                    
-                                    // Default to false (one-time purchase) for unknown types
                                     const purchaseType = isSubscription ? 'subscription' : 'exam';
-                                    console.log(`✅ Purchase type detected: ${purchaseType}`, { 
-                                        metadata: checkoutData?.metadata,
-                                        priceIds: checkoutData?.items?.map((i: any) => i.price?.id),
-                                    });
+                                    console.log(`✅ Purchase type detected: ${purchaseType}`);
                                     
-                                    // Poll for the update (Vercel-friendly approach)
-                                    pollForBillingUpdate(
-                                        purchaseType,
-                                        isProRef.current,
-                                        examCreditsRef.current,
-                                        () => {
-                                            // Success - update detected
-                                            setIsPolling(false);
-                                            toast.success('Account updated successfully!');
-                                            // Force a full page refresh to get fresh server data
-                                            window.location.href = `/dashboard/billing?success=true&type=${purchaseType}`;
-                                        },
-                                        () => {
-                                            // Timeout - redirect anyway (webhook might be slow)
-                                            setIsPolling(false);
-                                            toast.info('Payment received! Your account will update shortly.');
-                                            window.location.href = `/dashboard/billing?success=true&type=${purchaseType}&pending=true`;
-                                        },
-                                        20, // max 20 attempts
-                                        1500, // 1.5 seconds between attempts (total ~30 seconds)
-                                        abortController.signal // Pass abort signal for cleanup
-                                    );
+                                    // IMMEDIATE REDIRECT - no polling, no delay
+                                    // The billing page will show processing state and auto-refresh
+                                    toast.success('Payment successful! Redirecting...');
+                                    
+                                    // Tiny delay just for toast to show, then redirect immediately
+                                    setTimeout(() => {
+                                        window.location.href = `/dashboard/billing?success=true&type=${purchaseType}&processing=true`;
+                                    }, 300);
                                     break;
 
                                 case 'checkout.closed':
@@ -353,23 +203,20 @@ function usePaddleJs(currentIsPro: boolean, currentExamCredits: number) {
         };
 
         document.body.appendChild(script);
+    }, []);
 
-        return () => {
-            // Abort any ongoing polling to prevent memory leaks
-            abortController.abort();
-        };
-    }, [router]);
-
-    return { isLoaded, error, isPolling };
+    return { isLoaded, error };
 }
 
 // ============================================================================
 // SUCCESS BANNER COMPONENT
 // ============================================================================
 
-function SuccessBanner({ type, plan }: { type: string; plan?: string }) {
+function SuccessBanner({ type, plan, isPro }: { type: string; plan?: string; isPro?: boolean }) {
     const getMessage = () => {
-        if (type === 'subscription') {
+        // If user is now Pro, always show subscription success message
+        // This handles cases where type detection might be wrong
+        if (isPro || type === 'subscription') {
             return `🎉 Welcome to Pro${plan ? ` (${plan})` : ''}! Your subscription is now active.`;
         }
         if (type === 'exam') {
@@ -378,13 +225,23 @@ function SuccessBanner({ type, plan }: { type: string; plan?: string }) {
         return '🎉 Payment successful!';
     };
 
+    const getSubMessage = () => {
+        if (isPro || type === 'subscription') {
+            return 'You now have unlimited access to all Pro features. Enjoy!';
+        }
+        if (type === 'exam') {
+            return 'Your exam credit has been added to your account.';
+        }
+        return 'Your account has been updated. Thank you for your purchase!';
+    };
+
     return (
         <div className="mb-6 p-4 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg flex items-center gap-3">
             <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 shrink-0" />
             <div>
                 <p className="font-medium text-green-800 dark:text-green-200">{getMessage()}</p>
                 <p className="text-sm text-green-600 dark:text-green-400">
-                    Your account has been updated. Thank you for your purchase!
+                    {getSubMessage()}
                 </p>
             </div>
         </div>
@@ -410,41 +267,45 @@ function CancelBanner() {
 }
 
 // ============================================================================
-// POLLING/PENDING BANNER COMPONENT
+// PROCESSING BANNER COMPONENT (Auto-refreshes until payment is processed)
 // ============================================================================
 
-function PollingBanner() {
-    return (
-        <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg flex items-center gap-3">
-            <Loader2 className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0 animate-spin" />
-            <div>
-                <p className="font-medium text-blue-800 dark:text-blue-200">Processing your payment...</p>
-                <p className="text-sm text-blue-600 dark:text-blue-400">
-                    Please wait while we update your account. This usually takes a few seconds.
-                </p>
-            </div>
-        </div>
-    );
-}
-
-function PendingBanner() {
+function ProcessingBanner() {
     const router = useRouter();
+    const [refreshCount, setRefreshCount] = useState(0);
+    const maxRefreshes = 10; // Max 10 refreshes
     
-    // Auto-refresh after 5 seconds to check if webhook has processed
+    // Auto-refresh with increasing intervals: 2s, 3s, 4s, 5s... (backs off over time)
+    // This reduces server load while still checking for updates
     useEffect(() => {
+        if (refreshCount >= maxRefreshes) return; // Stop after max attempts
+        
+        // Increasing delay: starts at 2s, increases by 500ms each time
+        const delay = 2000 + (refreshCount * 500);
+        
         const timer = setTimeout(() => {
+            setRefreshCount(prev => prev + 1);
             router.refresh();
-        }, 5000);
+        }, delay);
+        
         return () => clearTimeout(timer);
-    }, [router]);
+    }, [router, refreshCount]);
+    
+    const isTimingOut = refreshCount >= maxRefreshes;
     
     return (
         <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg flex items-center gap-3">
-            <Loader2 className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0 animate-spin" />
+            <Loader2 className={`h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0 ${isTimingOut ? '' : 'animate-spin'}`} />
             <div>
-                <p className="font-medium text-blue-800 dark:text-blue-200">Payment received!</p>
+                <p className="font-medium text-blue-800 dark:text-blue-200">
+                    {isTimingOut 
+                        ? 'Payment received! Your account will update shortly.' 
+                        : 'Payment received! Activating your account...'}
+                </p>
                 <p className="text-sm text-blue-600 dark:text-blue-400">
-                    Your account is being updated. This page will refresh automatically...
+                    {isTimingOut 
+                        ? 'You can refresh the page manually or continue using the app.' 
+                        : 'This usually takes just a few seconds. Please wait...'}
                 </p>
             </div>
         </div>
@@ -467,14 +328,31 @@ export function BillingClient({
     const searchParams = useSearchParams();
     const [isPending, startTransition] = useTransition();
     const [loadingState, setLoadingState] = useState<LoadingState>(null);
-    const { isLoaded: paddleLoaded, error: paddleError, isPolling } = usePaddleJs(isPro, oneTimeExamsRemaining);
+    const { isLoaded: paddleLoaded, error: paddleError } = usePaddleJs();
 
     // Check for success/cancel URL params
     const isSuccess = searchParams.get('success') === 'true';
     const isCancelled = searchParams.get('cancelled') === 'true';
-    const isPending_url = searchParams.get('pending') === 'true';
+    const isProcessing = searchParams.get('processing') === 'true';
     const purchaseType = searchParams.get('type');
     const planType = searchParams.get('plan');
+    
+    // If processing=true, the page was redirected right after checkout
+    // We need to check if the webhook has updated the user's status
+    // If isPro is now true (for subscription) or we have exam credits, show success
+    // Otherwise show processing state with auto-refresh
+    const paymentProcessed = isProcessing && (
+        (purchaseType === 'subscription' && isPro) ||
+        (purchaseType === 'exam' && oneTimeExamsRemaining > 0)
+    );
+
+    // When payment is processed, immediately clear the URL params to stop refreshing
+    useEffect(() => {
+        if (paymentProcessed) {
+            // Replace URL to remove processing param - this stops the ProcessingBanner refresh
+            router.replace('/dashboard/billing?success=true&type=' + (purchaseType || 'payment'), { scroll: false });
+        }
+    }, [paymentProcessed, purchaseType, router]);
 
     // FRONTEND GUARD: Check if user can subscribe
     // User should NOT be able to subscribe if they already have an active subscription
@@ -643,10 +521,9 @@ export function BillingClient({
 
     return (
         <div className="flex-1 space-y-4 p-4 pt-6">
-            {/* Polling/Pending/Success/Cancel Banners */}
-            {isPolling && <PollingBanner />}
-            {isPending_url && !isPolling && <PendingBanner />}
-            {isSuccess && !isPending_url && !isPolling && <SuccessBanner type={purchaseType || 'payment'} plan={planType || undefined} />}
+            {/* Success/Processing/Cancel Banners */}
+            {isProcessing && !paymentProcessed && <ProcessingBanner />}
+            {(isSuccess || paymentProcessed) && <SuccessBanner type={purchaseType || 'payment'} plan={planType || undefined} isPro={isPro} />}
             {isCancelled && <CancelBanner />}
 
             {/* Paddle Error Banner */}

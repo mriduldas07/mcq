@@ -545,6 +545,9 @@ export async function getUserBillingStatusAction() {
  * Works on Vercel where webhook revalidatePath doesn't reach the client
  * 
  * Returns fresh data directly from DB, bypassing any cache
+ * 
+ * IMPORTANT: Uses $queryRaw or uncached query to ensure we get fresh data
+ * on serverless platforms like Vercel where connection pooling may cache results
  */
 export async function pollBillingStatusAction(): Promise<{
     success: boolean;
@@ -565,31 +568,49 @@ export async function pollBillingStatusAction(): Promise<{
             return { success: false, error: "Unauthorized" };
         }
 
-        // Fetch fresh data directly from database (no cache)
-        const user = await prisma.user.findUnique({
-            where: { id: session.userId },
-            select: {
-                planType: true,
-                subscriptionStatus: true,
-                oneTimeExamsRemaining: true,
-                freeExamsUsed: true,
-                currentPeriodEnd: true,
-                subscriptions: {
-                    where: { status: SubscriptionStatus.ACTIVE },
-                    orderBy: { currentPeriodEnd: 'desc' },
-                    take: 1,
-                    select: { id: true, status: true, currentPeriodEnd: true },
+        // Force fresh data by using a transaction (bypasses any query cache)
+        const user = await prisma.$transaction(async (tx) => {
+            return tx.user.findUnique({
+                where: { id: session.userId },
+                select: {
+                    planType: true,
+                    subscriptionStatus: true,
+                    oneTimeExamsRemaining: true,
+                    freeExamsUsed: true,
+                    currentPeriodEnd: true,
+                    subscriptions: {
+                        where: { status: SubscriptionStatus.ACTIVE },
+                        orderBy: { currentPeriodEnd: 'desc' },
+                        take: 1,
+                        select: { id: true, status: true, currentPeriodEnd: true },
+                    },
                 },
-            },
+            });
         });
 
         if (!user) {
             return { success: false, error: "User not found" };
         }
 
-        // Mirror getUserBillingStatusAction: check for active subscription with valid currentPeriodEnd
+        // Check for active subscription with valid currentPeriodEnd
         const activeSubscription = user.subscriptions[0] || null;
-        const isPro = activeSubscription && new Date() <= activeSubscription.currentPeriodEnd;
+        const hasActiveSubscription = !!activeSubscription && new Date() <= new Date(activeSubscription.currentPeriodEnd);
+        
+        // isPro can be determined by:
+        // 1. User has planType = 'PRO' (set by webhook)
+        // 2. OR user has an active subscription with valid period
+        // 3. OR subscriptionStatus is 'ACTIVE'
+        const isPro = user.planType === 'PRO' || 
+                      hasActiveSubscription || 
+                      user.subscriptionStatus === 'ACTIVE';
+
+        console.log(`📊 Poll result for user ${session.userId}:`, {
+            planType: user.planType,
+            subscriptionStatus: user.subscriptionStatus,
+            isPro,
+            hasActiveSubscription,
+            oneTimeExamsRemaining: user.oneTimeExamsRemaining,
+        });
 
         return {
             success: true,
@@ -600,7 +621,7 @@ export async function pollBillingStatusAction(): Promise<{
                 oneTimeExamsRemaining: user.oneTimeExamsRemaining,
                 freeExamsUsed: user.freeExamsUsed,
                 currentPeriodEnd: user.currentPeriodEnd,
-                hasActiveSubscription: !!activeSubscription,
+                hasActiveSubscription,
             },
         };
     } catch (error: any) {

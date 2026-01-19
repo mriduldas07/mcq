@@ -27,6 +27,12 @@ export default async function DashboardLayout({
         redirect("/api/auth/force-signout");
     }
     
+    if (sessionResult.status === "error") {
+        // Database error during verification - show error page instead of forcing sign-out
+        // This allows retry on transient DB issues without losing the session
+        throw new Error(`Session verification failed: ${sessionResult.error}`);
+    }
+    
     // Session is valid
     const session = sessionResult.session;
 

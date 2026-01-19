@@ -16,7 +16,8 @@ export type SessionUser = {
 export type SessionCheckResult = 
     | { status: "valid"; session: SessionUser }
     | { status: "no_session" }
-    | { status: "invalid_session" }; // Session exists but user not in DB
+    | { status: "invalid_session" } // Session exists but user not in DB
+    | { status: "error"; error: string }; // DB error during verification
 
 /**
  * Get current session (NextAuth wrapper)
@@ -73,8 +74,9 @@ export async function verifySessionWithDbCheck(): Promise<SessionCheckResult> {
         return { status: "valid", session };
     } catch (error) {
         console.error("Database check failed during session verification:", error);
-        // For safety, treat DB errors as invalid session
-        return { status: "invalid_session" };
+        // Return distinct error status so callers can retry or show appropriate UI
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        return { status: "error", error: errorMessage };
     }
 }
 

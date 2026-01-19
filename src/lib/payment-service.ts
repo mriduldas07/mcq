@@ -160,7 +160,8 @@ export const PaymentService = {
     },
 
     /**
-     * Create a Pro subscription (called after Paddle webhook)
+     * Create or update a Pro subscription (called after Paddle webhook)
+     * Uses upsert to handle duplicate webhook events gracefully
      */
     async createSubscription(
         userId: string,
@@ -171,9 +172,10 @@ export const PaymentService = {
         currentPeriodEnd: Date,
         amount: number
     ) {
-        // Create subscription record
-        await prisma.subscription.create({
-            data: {
+        // Use upsert to handle duplicate webhook events (Paddle may send same event multiple times)
+        await prisma.subscription.upsert({
+            where: { paddleSubscriptionId },
+            create: {
                 userId,
                 plan,
                 status: SubscriptionStatus.ACTIVE,
@@ -183,13 +185,26 @@ export const PaymentService = {
                 currentPeriodEnd,
                 amount,
                 currency: 'USD'
+            },
+            update: {
+                // Update fields that might change on duplicate events
+                status: SubscriptionStatus.ACTIVE,
+                currentPeriodStart,
+                currentPeriodEnd,
+                amount,
             }
         });
 
-        // Update user plan type
+        // Update user plan type and subscription status
         await prisma.user.update({
             where: { id: userId },
-            data: { planType: 'PRO' }
+            data: { 
+                planType: 'PRO',
+                subscriptionStatus: SubscriptionStatusType.ACTIVE,
+                currentPeriodEnd,
+                paddleSubscriptionId,
+                paddleCustomerId,
+            }
         });
     },
 

@@ -118,22 +118,45 @@ function verifyWebhookSignature(rawBody: string, signature: string): boolean {
 /**
  * Atomically claim a webhook event (idempotency) by inserting a PROCESSING record.
  * If another process already claimed/completed it, we detect and skip.
+ * 
+ * IMPORTANT: Events in PROCESSING state for more than 5 minutes are considered stale
+ * and can be reclaimed (to handle crashed/timed-out workers).
  */
-async function claimWebhookEvent(eventId: string, eventType: string): Promise<'claimed' | 'exists-processing' | 'exists-completed' | 'skip'> {
+async function claimWebhookEvent(eventId: string, eventType: string): Promise<'claimed' | 'exists-completed' | 'skip'> {
     try {
         // Attempt to create a PROCESSING record; unique(eventId) prevents duplicates
-        const created = await prisma.webhookEvent.create({
+        await prisma.webhookEvent.create({
             data: { eventId, eventType, status: 'PROCESSING' }
         });
-        if (created) return 'claimed';
+        return 'claimed';
     } catch (error: any) {
         // If unique constraint violation, fetch existing to check status
         const existing = await prisma.webhookEvent.findUnique({ where: { eventId } }).catch(() => null);
         if (!existing) return 'skip';
+        
+        // If already completed, skip
         if (existing.status === 'COMPLETED') return 'exists-completed';
-        return 'exists-processing';
+        
+        // If PROCESSING but older than 5 minutes, consider it stale and reclaim
+        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+        if (existing.status === 'PROCESSING' && existing.createdAt < fiveMinutesAgo) {
+            // Try to reclaim stale event
+            try {
+                await prisma.webhookEvent.update({
+                    where: { eventId, status: 'PROCESSING' },
+                    data: { status: 'PROCESSING', createdAt: new Date() } // Reset timestamp
+                });
+                console.log(`🔄 Reclaimed stale event ${eventId}`);
+                return 'claimed';
+            } catch {
+                return 'skip';
+            }
+        }
+        
+        // Event is being processed by another worker (recent), skip
+        // But don't log as error - this is normal during retries
+        return 'skip';
     }
-    return 'skip';
 }
 
 /**
@@ -234,14 +257,13 @@ export async function POST(request: NextRequest) {
                 console.log(`⏭️ Event ${eventId} already completed, skipping`);
                 return NextResponse.json({ received: true, skipped: true });
             }
-            if (claim === 'exists-processing') {
-                console.log(`⏭️ Event ${eventId} already being processed, skipping`);
+            if (claim === 'skip') {
+                // Being processed by another worker or could not be claimed
+                // Return 200 to prevent Paddle from retrying
+                console.log(`⏭️ Event ${eventId} being processed by another worker, skipping`);
                 return NextResponse.json({ received: true, skipped: true });
             }
-            if (claim !== 'claimed') {
-                console.log(`⏭️ Event ${eventId} could not be claimed, skipping`);
-                return NextResponse.json({ received: true, skipped: true });
-            }
+            // claim === 'claimed' - proceed with processing
         }
 
         // 5. Process event based on type
@@ -249,9 +271,9 @@ export async function POST(request: NextRequest) {
             // ----------------------------------------------------------------
             // TRANSACTION COMPLETED - One-time purchases & subscription payments
             // This is the SINGLE SOURCE OF TRUTH for payment success
+            // We only process transaction.completed (not transaction.paid) to avoid duplicates
             // ----------------------------------------------------------------
-            case 'transaction.completed':
-            case 'transaction.paid': {
+            case 'transaction.completed': {
                 const customerId = eventData.customer_id;
                 const customData = eventData.custom_data;
                 const transactionId = eventData.id;
@@ -269,6 +291,25 @@ export async function POST(request: NextRequest) {
                     break;
                 }
 
+                // Check if we already processed this transaction (by transactionId in payment record)
+                // Note: paddleTransactionId field may not exist if migration hasn't run yet
+                try {
+                    const existingPayment = await prisma.payment.findFirst({
+                        where: { 
+                            teacherId: user.id,
+                            paddleTransactionId: transactionId,
+                        },
+                    });
+
+                    if (existingPayment) {
+                        console.log(`⏭️ Payment for transaction ${transactionId} already recorded, skipping`);
+                        break;
+                    }
+                } catch (e) {
+                    // Field might not exist yet - continue with creation
+                    console.log(`ℹ️ paddleTransactionId field check skipped (migration pending)`);
+                }
+
                 // Update user's Paddle customer ID if not set
                 if (customerId) {
                     await prisma.user.updateMany({
@@ -279,16 +320,31 @@ export async function POST(request: NextRequest) {
 
                 // Handle ONE-TIME EXAM purchase (pay-per-exam)
                 if (priceId === PADDLE_PRICE_IDS.ONE_TIME_EXAM) {
-                    // Record payment in transaction history
-                    await prisma.payment.create({
-                        data: {
-                            teacherId: user.id,
-                            amount: totalAmount,
-                            currency,
-                            status: 'COMPLETED',
-                            type: 'ONE_TIME_EXAM',
-                        }
-                    });
+                    // Record payment in transaction history with transactionId for idempotency
+                    // Use try-catch for paddleTransactionId in case migration hasn't run
+                    try {
+                        await prisma.payment.create({
+                            data: {
+                                teacherId: user.id,
+                                amount: totalAmount,
+                                currency,
+                                status: 'COMPLETED',
+                                type: 'ONE_TIME_EXAM',
+                                paddleTransactionId: transactionId,
+                            }
+                        });
+                    } catch (e) {
+                        // Fallback without paddleTransactionId if field doesn't exist
+                        await prisma.payment.create({
+                            data: {
+                                teacherId: user.id,
+                                amount: totalAmount,
+                                currency,
+                                status: 'COMPLETED',
+                                type: 'ONE_TIME_EXAM',
+                            }
+                        });
+                    }
 
                     // Grant one exam credit - this does NOT affect subscription
                     await PaymentService.grantOneTimeExam(user.id, 1);
@@ -301,16 +357,31 @@ export async function POST(request: NextRequest) {
                     priceId === PADDLE_PRICE_IDS.PRO_MONTHLY || 
                     priceId === PADDLE_PRICE_IDS.PRO_YEARLY) {
                     
-                    // Record subscription payment in transaction history
-                    await prisma.payment.create({
-                        data: {
-                            teacherId: user.id,
-                            amount: totalAmount,
-                            currency,
-                            status: 'COMPLETED',
-                            type: 'SUBSCRIPTION',
-                        }
-                    });
+                    // Record subscription payment in transaction history with transactionId for idempotency
+                    // Use try-catch for paddleTransactionId in case migration hasn't run
+                    try {
+                        await prisma.payment.create({
+                            data: {
+                                teacherId: user.id,
+                                amount: totalAmount,
+                                currency,
+                                status: 'COMPLETED',
+                                type: 'SUBSCRIPTION',
+                                paddleTransactionId: transactionId,
+                            }
+                        });
+                    } catch (e) {
+                        // Fallback without paddleTransactionId if field doesn't exist
+                        await prisma.payment.create({
+                            data: {
+                                teacherId: user.id,
+                                amount: totalAmount,
+                                currency,
+                                status: 'COMPLETED',
+                                type: 'SUBSCRIPTION',
+                            }
+                        });
+                    }
 
                     // If this is a renewal, update the subscription period
                     if (subscriptionId) {
@@ -425,16 +496,8 @@ export async function POST(request: NextRequest) {
                     },
                 });
 
-                // Record subscription payment in transaction history
-                await prisma.payment.create({
-                    data: {
-                        teacherId: user.id,
-                        amount: amount,
-                        currency: 'USD',
-                        status: 'COMPLETED',
-                        type: 'SUBSCRIPTION',
-                    }
-                });
+                // NOTE: Payment record is created by transaction.completed/transaction.paid event
+                // Do NOT create payment here to avoid duplicates
 
                 console.log(`✅ User ${user.id} upgraded to PRO with subscription ${subscriptionId}`);
                 break;
@@ -694,6 +757,14 @@ export async function POST(request: NextRequest) {
                 }
 
                 console.log(`▶️ Subscription ${subscriptionId} resumed`);
+                break;
+            }
+
+            // ----------------------------------------------------------------
+            // TRANSACTION PAID - Ignored, we use transaction.completed instead
+            // ----------------------------------------------------------------
+            case 'transaction.paid': {
+                console.log(`ℹ️ Ignoring transaction.paid - using transaction.completed for payment recording`);
                 break;
             }
 

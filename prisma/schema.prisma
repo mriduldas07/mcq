@@ -156,14 +156,18 @@ model StudentAttempt {
 }
 
 model Payment {
-  id        String        @id @default(cuid())
-  teacherId String
-  teacher   User          @relation(fields: [teacherId], references: [id])
-  amount    Int // Amount in cents
-  currency  String        @default("USD")
-  status    PaymentStatus @default(PENDING)
-  type      PaymentType
-  createdAt DateTime      @default(now())
+  id                   String        @id @default(cuid())
+  teacherId            String
+  teacher              User          @relation(fields: [teacherId], references: [id])
+  amount               Int // Amount in cents
+  currency             String        @default("USD")
+  status               PaymentStatus @default(PENDING)
+  type                 PaymentType
+  paddleTransactionId  String?       @unique // Paddle transaction ID for idempotency
+  createdAt            DateTime      @default(now())
+
+  @@index([teacherId])
+  @@index([paddleTransactionId])
 }
 
 enum PaymentStatus {
