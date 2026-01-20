@@ -22,6 +22,7 @@ export const authConfig = {
   ],
   pages: {
     signIn: "/login",
+    error: "/error",
   },
   events: {
     async signIn() {
@@ -166,6 +167,32 @@ export const authConfig = {
         sameSite: "lax",
         path: "/",
         secure: process.env.NODE_ENV === "production",
+      },
+    },
+    // PKCE code verifier cookie - ensure it persists during OAuth flow
+    pkceCodeVerifier: {
+      name: process.env.NODE_ENV === "production"
+        ? "__Secure-authjs.pkce.code_verifier"
+        : "authjs.pkce.code_verifier",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 60 * 15, // 15 minutes - enough for OAuth flow
+      },
+    },
+    // State cookie - ensure it persists during OAuth flow
+    state: {
+      name: process.env.NODE_ENV === "production"
+        ? "__Secure-authjs.state"
+        : "authjs.state",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 60 * 15, // 15 minutes - enough for OAuth flow
       },
     },
   },

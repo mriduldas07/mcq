@@ -11,6 +11,22 @@ function LoginContent() {
     const searchParams = useSearchParams();
     const sessionExpired = searchParams.get("session_expired") === "true";
     
+    // Clear any stale OAuth cookies before signing in
+    const handleSignIn = () => {
+        // Clear any existing OAuth state cookies to prevent "Invalid code verifier" errors
+        // This happens when user navigates back after authentication
+        document.cookie.split(";").forEach(cookie => {
+            const cookieName = cookie.split("=")[0].trim();
+            if (cookieName.includes("authjs") || cookieName.includes("next-auth")) {
+                // Clear the cookie by setting it to expire in the past
+                document.cookie = `${cookieName}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+            }
+        });
+        
+        // Now proceed with sign-in
+        signIn("google", { callbackUrl: "/dashboard" });
+    };
+    
     return (
         <div className="min-h-screen max-w-full overflow-x-hidden flex flex-col">
             {/* Simple Header */}
@@ -79,7 +95,7 @@ function LoginContent() {
                                 {/* Sign in button */}
                                 <Button 
                                     type="button"
-                                    onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
+                                    onClick={handleSignIn}
                                     className="w-full h-14 text-base font-semibold bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-900 dark:text-white border-2 border-slate-200 dark:border-slate-700 shadow-lg hover:shadow-xl transition-all duration-300 group"
                                     variant="outline"
                                 >

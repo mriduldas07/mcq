@@ -69,7 +69,6 @@ export default function CreateExamPage() {
             allowLateSubmission: data.get("allowLateSubmission") === "true",
             negativeMarking: data.get("negativeMarking") === "true",
             negativeMarks: parseFloat(data.get("negativeMarks") as string) || 0,
-            priceMode: data.get("priceMode") as string,
         };
         
         setFormData(data);
@@ -194,22 +193,9 @@ export default function CreateExamPage() {
                                 <Label htmlFor="description" className="text-xs sm:text-[13px] font-medium">Description</Label>
                                 <Textarea id="description" name="description" placeholder="Brief description of the exam content and objectives" rows={3} className="text-sm sm:text-[15px] leading-relaxed min-h-18 sm:min-h-20" />
                             </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 md:gap-5">
-                                <div className="space-y-1.5 sm:space-y-2">
-                                    <Label htmlFor="duration" className="text-xs sm:text-[13px] font-medium">Duration (minutes) *</Label>
-                                    <Input id="duration" name="duration" type="number" min="1" defaultValue="60" required className="text-sm sm:text-[15px] h-9 sm:h-10" />
-                                </div>
-                                <div className="space-y-1.5 sm:space-y-2">
-                                    <Label htmlFor="priceMode" className="text-xs sm:text-[13px] font-medium">Monetization</Label>
-                                    <select
-                                        id="priceMode"
-                                        name="priceMode"
-                                        className="flex h-9 sm:h-10 w-full rounded-md border border-input bg-background px-2.5 sm:px-3 py-1.5 sm:py-2 text-sm sm:text-[15px] ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                    >
-                                        <option value="FREE">Free (Subscription)</option>
-                                        <option value="PAID_BY_TEACHER">Pay Per Exam</option>
-                                    </select>
-                                </div>
+                            <div className="space-y-1.5 sm:space-y-2">
+                                <Label htmlFor="duration" className="text-xs sm:text-[13px] font-medium">Duration (minutes) *</Label>
+                                <Input id="duration" name="duration" type="number" min="1" defaultValue="60" required className="text-sm sm:text-[15px] h-9 sm:h-10" />
                             </div>
                         </CardContent>
                         <CardFooter className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-2 sm:gap-0 border-t bg-muted/20 pt-3 sm:pt-4 md:pt-5 pb-3 sm:pb-4 md:pb-5 px-3 sm:px-4 md:px-6">
