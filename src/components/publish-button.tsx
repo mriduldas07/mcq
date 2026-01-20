@@ -19,18 +19,42 @@ type PublishButtonProps = {
     canPublish: boolean;
     isPro: boolean;
     questionCount: number;
+    questions?: Array<{
+        id: string;
+        text: string;
+        options: any;
+        correctOption: string;
+    }>;
 };
 
-export function PublishButton({ examId, canPublish, isPro, questionCount }: PublishButtonProps) {
+export function PublishButton({ examId, canPublish, isPro, questionCount, questions = [] }: PublishButtonProps) {
     const [isPending, startTransition] = useTransition();
     const [showDialog, setShowDialog] = useState(false);
     const [errorMessage, setErrorMessage] = useState("");
 
     const hasQuestions = questionCount > 0;
 
+    // Validate questions
+    const invalidQuestions = questions.filter(q => {
+        if (!q.text || !q.text.trim()) return true;
+        if (!q.correctOption) return true;
+        const options = Array.isArray(q.options) ? q.options : JSON.parse(q.options || '[]');
+        if (options.length < 2) return true;
+        if (options.some((opt: any) => !opt.text || !opt.text.trim())) return true;
+        return false;
+    });
+
+    const hasValidationErrors = invalidQuestions.length > 0;
+
     const handlePublish = () => {
         if (!hasQuestions) {
             setErrorMessage("Cannot publish an exam without questions. Add at least one question first.");
+            setShowDialog(true);
+            return;
+        }
+
+        if (hasValidationErrors) {
+            setErrorMessage(`Found ${invalidQuestions.length} incomplete question(s). Please ensure all questions have:\n• Question text\n• At least 2 options\n• All option fields filled\n• A correct answer selected`);
             setShowDialog(true);
             return;
         }
@@ -58,7 +82,7 @@ export function PublishButton({ examId, canPublish, isPro, questionCount }: Publ
         <>
             <Button
                 onClick={handlePublish}
-                disabled={isPending || !hasQuestions}
+                disabled={isPending || !hasQuestions || hasValidationErrors}
                 variant="default"
                 size="sm"
                 className={`relative transition-all ${
@@ -66,6 +90,7 @@ export function PublishButton({ examId, canPublish, isPro, questionCount }: Publ
                         ? 'bg-green-600 hover:bg-green-700' 
                         : ''
                 }`}
+                title={hasValidationErrors ? `${invalidQuestions.length} incomplete question(s)` : undefined}
             >
                 {!canPublish && <Lock className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />}
                 {isPending && <Loader2 className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" />}

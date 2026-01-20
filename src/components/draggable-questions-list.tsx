@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
 
 interface SortableItemProps {
   id: string;
-  children: React.ReactNode;
+  children: (dragHandleProps: any) => React.ReactNode;
   disabled?: boolean;
 }
 
@@ -42,25 +42,18 @@ function SortableItem({ id, children, disabled }: SortableItemProps) {
     transition,
   };
 
+  const dragHandleProps = disabled ? {} : { ...attributes, ...listeners };
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={cn(
-        "relative group",
+        "relative",
         isDragging && "opacity-50 z-50"
       )}
     >
-      {!disabled && (
-        <div
-          {...attributes}
-          {...listeners}
-          className="absolute left-2 top-1/2 -translate-y-1/2 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity z-10 bg-background/80 backdrop-blur-sm rounded p-1"
-        >
-          <GripVertical className="h-5 w-5 text-muted-foreground" />
-        </div>
-      )}
-      <div className={cn(!disabled && "pl-10")}>{children}</div>
+      {children(dragHandleProps)}
     </div>
   );
 }
@@ -68,7 +61,7 @@ function SortableItem({ id, children, disabled }: SortableItemProps) {
 interface DraggableQuestionsListProps {
   items: Array<{ id: string; [key: string]: any }>;
   onReorder: (newOrder: Array<{ id: string; [key: string]: any }>) => void;
-  renderItem: (item: any, index: number) => React.ReactNode;
+  renderItem: (item: any, index: number, dragHandleProps: any) => React.ReactNode;
   disabled?: boolean;
 }
 
@@ -124,7 +117,7 @@ export function DraggableQuestionsList({
         <div className="space-y-4">
           {localItems.map((item, index) => (
             <SortableItem key={item.id} id={item.id} disabled={disabled}>
-              {renderItem(item, index)}
+              {(dragHandleProps) => renderItem(item, index, dragHandleProps)}
             </SortableItem>
           ))}
         </div>

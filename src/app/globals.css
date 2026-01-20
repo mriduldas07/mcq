@@ -350,3 +350,40 @@
     radial-gradient(at 100% 100%, rgba(244, 114, 182, 0.15) 0px, transparent 50%),
     radial-gradient(at 0% 100%, rgba(34, 211, 238, 0.15) 0px, transparent 50%);
 }
+
+/* Tiptap Editor Styles */
+.ProseMirror {
+  outline: none;
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  color: #adb5bd;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.ProseMirror ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+}
+
+.ProseMirror ol {
+  list-style-type: decimal;
+  padding-left: 1.5rem;
+}
+
+.ProseMirror li {
+  margin-bottom: 0.25rem;
+}
+
+/* KaTeX Math Rendering */
+.katex {
+  font-size: 1.1em;
+}
+
+.katex-display {
+  margin: 1em 0;
+  text-align: center;
+}

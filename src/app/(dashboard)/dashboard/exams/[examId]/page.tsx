@@ -3,21 +3,17 @@ import { prisma } from "@/lib/prisma";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, AlertCircle } from "lucide-react";
-import { addQuestionAction } from "@/actions/exam";
+import { AlertCircle } from "lucide-react";
 import { CopyLinkButton } from "@/components/copy-link-button";
 import { PublishButton } from "@/components/publish-button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { DeleteQuestionButton } from "@/components/delete-question-button";
 import { DeleteExamButton } from "@/components/delete-exam-button";
 import { EditExamForm } from "@/components/edit-exam-form";
 import { BulkImportButton } from "@/components/bulk-import-button";
-import { SaveToBankButton } from "@/components/save-to-bank-button";
 import { ImportFromBankButton } from "@/components/import-from-bank-button";
-import { ExamQuestionsList } from "@/components/exam-questions-list";
+import { EnhancedQuestionsList } from "@/components/enhanced-questions-list";
 import { ExamBlueprint } from "@/components/exam-blueprint";
+import { AddQuestionForm } from "@/components/add-question-form";
+import { BulkPasteDialog } from "@/components/bulk-paste-dialog";
 import { verifySession } from "@/lib/session";
 import { Prisma } from "@prisma/client";
 import Link from "next/link";
@@ -94,20 +90,43 @@ export default async function ExamEditorPage({
     const oneTimeExamsRemaining = user?.oneTimeExamsRemaining || 0;
     const canPublish = isPro || freeExamsRemaining > 0 || oneTimeExamsRemaining > 0;
 
+    const totalMarks = exam.questions.length; // 1 mark per question
+
+    // Parse JSON options for each question
+    const questionsWithParsedOptions = exam.questions.map(q => ({
+        ...q,
+        options: typeof q.options === 'string' ? JSON.parse(q.options) : q.options
+    }));
+
     return (
         <div className="flex-1 space-y-4 sm:space-y-6 overflow-hidden w-full max-w-full px-3 sm:px-0">
-            {/* Header Section */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 min-w-0">
-                <h2 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold tracking-tight wrap-break-word pr-2">{exam.title}</h2>
+            {/* Top Bar with Exam Info & Blueprint */}
+            <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+                {/* Left: Exam Title & Meta */}
+                <div className="flex-1 min-w-0">
+                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-2">{exam.title}</h1>
+                    <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                        <span className="font-medium">{exam.questions.length} Questions</span>
+                        <span>•</span>
+                        <span className="font-medium">{totalMarks} Marks</span>
+                        <span>•</span>
+                        <span>{exam.duration} Minutes</span>
+                    </div>
+                </div>
+
+                {/* Right: Actions */}
                 <div className="flex flex-wrap items-center gap-2">
                     {exam.status === 'PUBLISHED' && <CopyLinkButton examId={examId} />}
-                    <span className="text-xs sm:text-sm text-muted-foreground uppercase font-semibold whitespace-nowrap">{exam.status}</span>
+                    <Badge variant={exam.status === 'PUBLISHED' ? 'default' : 'secondary'} className="uppercase text-xs">
+                        {exam.status}
+                    </Badge>
                     {exam.status !== 'PUBLISHED' && (
                         <PublishButton 
                             examId={examId} 
                             canPublish={canPublish}
                             isPro={isPro}
                             questionCount={exam.questions.length}
+                            questions={questionsWithParsedOptions}
                         />
                     )}
                     {exam.status !== 'PUBLISHED' && (
@@ -162,194 +181,142 @@ export default async function ExamEditorPage({
                 </Card>
             )}
 
-            <div className="grid gap-4 md:grid-cols-[1fr_350px] overflow-hidden">
+            {/* Main Content Grid: Questions + Sidebar */}
+            <div className="grid gap-6 lg:grid-cols-[1fr_380px] overflow-hidden">
+                {/* Main Area: Question Cards + Add Question */}
                 <div className="space-y-4 min-w-0">
-                    {/* Question List with Drag and Drop */}
-                    <ExamQuestionsList
+                    <EnhancedQuestionsList
                         examId={examId}
-                        questions={exam.questions}
+                        questions={questionsWithParsedOptions}
                         bankStatusMap={bankStatusMap}
                         isPublished={exam.status === 'PUBLISHED'}
+                        isPro={isPro}
                     />
 
-                    {/* Add Question Form */}
+                    {exam.questions.length === 0 && exam.status !== 'PUBLISHED' && (
+                        <Card className="border-dashed border-2">
+                            <CardContent className="p-12 text-center">
+                                <p className="text-muted-foreground text-lg mb-2">No questions yet</p>
+                                <p className="text-sm text-muted-foreground">
+                                    Add your first question below ↓
+                                </p>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {/* Add New Question Form */}
                     {exam.status !== 'PUBLISHED' && (
-                        <Card>
-                            <CardHeader>
-                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-2">
-                                    <CardTitle className="text-base sm:text-lg">Add New Question</CardTitle>
-                                    <div className="flex flex-wrap gap-2">
+                        <Card className="border-primary/30 shadow-sm">
+                            <CardHeader className="pb-3">
+                                <div className="flex items-center justify-between flex-wrap gap-2">
+                                    <CardTitle className="text-lg">Add New Question</CardTitle>
+                                    <div className="flex gap-2">
+                                        <BulkPasteDialog examId={examId} />
                                         <ImportFromBankButton examId={examId} />
-                                        <BulkImportButton examId={examId} />
                                     </div>
                                 </div>
                             </CardHeader>
-                            <CardContent className="p-3 sm:p-6">
-                                <form action={addQuestionAction.bind(null, examId)} className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label className="text-xs sm:text-sm">Question Text</Label>
-                                        <Textarea name="text" placeholder="What is the capital of France?" required className="resize-none" rows={3} />
-                                    </div>
-                                    <div className="grid gap-2">
-                                        <Label className="text-xs sm:text-sm">Options (select the correct answer)</Label>
-                                        {[0, 1, 2, 3].map((i) => (
-                                            <div key={i} className="flex items-center gap-2 min-w-0">
-                                                <input type="radio" name="correctOption" value={i} required className="h-4 w-4 shrink-0" defaultChecked={i === 0} />
-                                                <Input name={`option${i}`} placeholder={`Option ${i + 1}`} required className="min-w-0 flex-1 text-sm" />
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <Button type="submit" className="w-full text-sm sm:text-base">
-                                        <Plus className="mr-2 h-4 w-4" /> Add Question
-                                    </Button>
-                                </form>
+                            <CardContent>
+                                <AddQuestionForm examId={examId} isPro={isPro} />
                             </CardContent>
                         </Card>
                     )}
                 </div>
 
-                {/* Sidebar settings */}
-                <div className="space-y-4 min-w-0">
-                    {/* Exam Blueprint */}
-                    <ExamBlueprint
-                        questions={exam.questions}
-                        duration={exam.duration}
-                        passPercentage={exam.passPercentage}
-                    />
+                {/* Right Sidebar: Advanced Settings */}
+                {exam.status !== 'PUBLISHED' && (
+                    <div className="space-y-4 min-w-0">
+                        <EditExamForm 
+                            examId={examId}
+                            initialTitle={exam.title}
+                            initialDescription={exam.description}
+                            initialDuration={exam.duration}
+                            status={exam.status}
+                            antiCheatEnabled={exam.antiCheatEnabled}
+                            maxViolations={exam.maxViolations}
+                            passPercentage={exam.passPercentage}
+                            shuffleQuestions={exam.shuffleQuestions}
+                            shuffleOptions={exam.shuffleOptions}
+                            showResultsImmediately={exam.showResultsImmediately}
+                            requirePassword={exam.requirePassword}
+                            examPassword={exam.examPassword}
+                            maxAttempts={exam.maxAttempts}
+                            scheduledStartTime={exam.scheduledStartTime}
+                            scheduledEndTime={exam.scheduledEndTime}
+                            allowLateSubmission={exam.allowLateSubmission}
+                        />
+                        
+                        {/* Bulk Import */}
+                        <Card>
+                            <CardHeader className="pb-3">
+                                <CardTitle className="text-base">Bulk Import</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <BulkImportButton examId={examId} />
+                            </CardContent>
+                        </Card>
 
-                    {/* TASK 5: Account Status Card */}
-                    <Card className={isPro ? "border-primary/20 bg-primary/5" : ""}>
-                        <CardHeader>
-                            <CardTitle className="text-base">
-                                {isPro ? "Pro Account" : "Free Account"}
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-2">
-                            {isPro ? (
-                                <div>
-                                    <p className="text-sm text-muted-foreground">
-                                        ✨ Unlimited exam publishing
-                                    </p>
-                                    <Link href="/dashboard/billing">
-                                        <Button variant="outline" size="sm" className="w-full mt-3">
-                                            Manage Subscription
-                                        </Button>
-                                    </Link>
-                                </div>
-                            ) : (
-                                <div>
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className="text-sm text-muted-foreground">Exams Remaining</span>
-                                        <div className="text-right">
-                                            <span className={`text-2xl font-bold ${
-                                                freeExamsRemaining === 0 && oneTimeExamsRemaining === 0 ? 'text-red-600' : 
-                                                freeExamsRemaining <= 1 ? 'text-yellow-600' : 
-                                                'text-green-600'
-                                            }`}>
-                                                {freeExamsRemaining + oneTimeExamsRemaining}
-                                            </span>
-                                        </div>
+                        {/* Account Status */}
+                        <Card className={isPro ? "border-primary/20 bg-primary/5" : ""}>
+                            <CardHeader className="pb-3">
+                                <CardTitle className="text-base">
+                                    {isPro ? "Pro Account" : "Free Account"}
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-2">
+                                {isPro ? (
+                                    <div>
+                                        <p className="text-sm text-muted-foreground">
+                                            ✨ Unlimited exam publishing
+                                        </p>
+                                        <Link href="/dashboard/billing">
+                                            <Button variant="outline" size="sm" className="w-full mt-3">
+                                                Manage Subscription
+                                            </Button>
+                                        </Link>
                                     </div>
-                                    <p className="text-xs text-muted-foreground mb-3">
-                                        {freeExamsRemaining} free + {oneTimeExamsRemaining} purchased
-                                    </p>
-                                    <Link href="/dashboard/billing">
-                                        <Button variant="default" size="sm" className="w-full">
-                                            Buy More or Upgrade
-                                        </Button>
-                                    </Link>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    <EditExamForm 
-                        examId={examId}
-                        initialTitle={exam.title}
-                        initialDescription={exam.description}
-                        initialDuration={exam.duration}
-                        status={exam.status}
-                        antiCheatEnabled={exam.antiCheatEnabled}
-                        maxViolations={exam.maxViolations}
-                        passPercentage={exam.passPercentage}
-                        shuffleQuestions={exam.shuffleQuestions}
-                        shuffleOptions={exam.shuffleOptions}
-                        showResultsImmediately={exam.showResultsImmediately}
-                        requirePassword={exam.requirePassword}
-                        examPassword={exam.examPassword}
-                        maxAttempts={exam.maxAttempts}
-                        scheduledStartTime={exam.scheduledStartTime}
-                        scheduledEndTime={exam.scheduledEndTime}
-                        allowLateSubmission={exam.allowLateSubmission}
-                    />
-                    
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Monetization</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-2">
-                            <p className="text-sm text-muted-foreground">
-                                Mode: <span className="font-medium text-foreground">
-                                    {exam.priceMode === 'FREE' ? 'Free (Subscription)' : 'Pay Per Exam'}
-                                </span>
-                            </p>
-                        </CardContent>
-                    </Card>
-
-                    {/* TASK 6: Anti-Cheat Settings */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">Anti-Cheat Protection</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm text-muted-foreground">Status</span>
-                                <span className={`text-sm font-medium ${exam.antiCheatEnabled ? 'text-green-600' : 'text-gray-600'}`}>
-                                    {exam.antiCheatEnabled ? '✓ Enabled' : '✗ Disabled'}
-                                </span>
-                            </div>
-                            {exam.antiCheatEnabled && (
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm text-muted-foreground">Max Violations</span>
-                                    <span className="text-sm font-medium">{exam.maxViolations}</span>
-                                </div>
-                            )}
-                            <div className="pt-2 border-t text-xs text-muted-foreground">
-                                {exam.antiCheatEnabled ? (
-                                    <ul className="space-y-1">
-                                        <li>• Detects tab switching</li>
-                                        <li>• Detects window blur</li>
-                                        <li>• Detects fullscreen exit</li>
-                                        <li>• Auto-submits after {exam.maxViolations} violations</li>
-                                    </ul>
                                 ) : (
-                                    <p>Anti-cheat is disabled for this exam.</p>
+                                    <div>
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-sm text-muted-foreground">Exams Remaining</span>
+                                            <div className="text-right">
+                                                <span className={`text-2xl font-bold ${
+                                                    freeExamsRemaining === 0 && oneTimeExamsRemaining === 0 ? 'text-red-600' : 
+                                                    freeExamsRemaining <= 1 ? 'text-yellow-600' : 
+                                                    'text-green-600'
+                                                }`}>
+                                                    {freeExamsRemaining + oneTimeExamsRemaining}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground mb-3">
+                                            {freeExamsRemaining} free + {oneTimeExamsRemaining} purchased
+                                        </p>
+                                        <Link href="/dashboard/billing">
+                                            <Button variant="default" size="sm" className="w-full">
+                                                Buy More or Upgrade
+                                            </Button>
+                                        </Link>
+                                    </div>
                                 )}
-                            </div>
-                            {exam.status !== 'PUBLISHED' && (
-                                <p className="text-xs text-muted-foreground italic">
-                                    Configure before publishing
-                                </p>
-                            )}
-                        </CardContent>
-                    </Card>
+                            </CardContent>
+                        </Card>
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Statistics</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-2">
-                            <div className="flex justify-between">
-                                <span className="text-sm text-muted-foreground">Questions</span>
-                                <span className="text-sm font-medium">{exam.questions.length}</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span className="text-sm text-muted-foreground">Duration</span>
-                                <span className="text-sm font-medium">{exam.duration} mins</span>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
+                        {/* Monetization */}
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-base">Monetization</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-2">
+                                <p className="text-sm text-muted-foreground">
+                                    Mode: <span className="font-medium text-foreground">
+                                        {exam.priceMode === 'FREE' ? 'Free (Subscription)' : 'Pay Per Exam'}
+                                    </span>
+                                </p>
+                            </CardContent>
+                        </Card>
+                    </div>
+                )}
             </div>
         </div>
     );

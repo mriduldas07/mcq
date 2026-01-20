@@ -68,7 +68,7 @@ export function ExamQuestionsList({
       items={questions}
       onReorder={handleReorder}
       disabled={isPublished || isPending}
-      renderItem={(q: Question, i: number) => {
+      renderItem={(q: Question, i: number, dragHandleProps: any) => {
         let options: Array<{ id: string; text: string }> = [];
         try {
           options = typeof q.options === "string"

@@ -254,14 +254,27 @@ export async function addQuestionAction(examId: string, formData: FormData) {
 
     const text = formData.get("text") as string;
     const correctOption = formData.get("correctOption") as string; // Will be the index 0-3
+    
     // Options are passed as separate fields option0, option1, etc.
-
+    // Dynamically detect how many options were sent
     const options = [];
-    for (let i = 0; i < 4; i++) {
+    let i = 0;
+    while (formData.has(`option${i}`)) {
         options.push({
             id: `opt-${i}`,
             text: formData.get(`option${i}`) as string
         });
+        i++;
+    }
+
+    // Fallback to 4 options if none detected
+    if (options.length === 0) {
+        for (let j = 0; j < 4; j++) {
+            options.push({
+                id: `opt-${j}`,
+                text: formData.get(`option${j}`) as string
+            });
+        }
     }
 
     try {
@@ -271,6 +284,7 @@ export async function addQuestionAction(examId: string, formData: FormData) {
                 text,
                 options: JSON.stringify(options), // Storing as JSON
                 correctOption: options[parseInt(correctOption)].id,
+                marks: 1, // Default 1 mark per question
             }
         });
         revalidatePath(`/dashboard/exams/${examId}`);
@@ -542,12 +556,39 @@ export async function updateQuestionAction(questionId: string, examId: string, f
         const text = formData.get("text") as string;
         const correctOption = formData.get("correctOption") as string;
 
+        // Dynamically detect how many options were sent
         const options = [];
-        for (let i = 0; i < 4; i++) {
+        let i = 0;
+        while (formData.has(`option${i}`)) {
             options.push({
                 id: `opt-${i}`,
                 text: formData.get(`option${i}`) as string
             });
+            i++;
+        }
+
+        // Fallback to 4 options if none detected
+        if (options.length === 0) {
+            for (let j = 0; j < 4; j++) {
+                const optText = formData.get(`option${j}`) as string;
+                if (optText) {
+                    options.push({
+                        id: `opt-${j}`,
+                        text: optText
+                    });
+                }
+            }
+        }
+
+        // correctOption can be either an ID (like "opt-0") or an index (like "0")
+        // If it's already an ID, use it directly; otherwise, convert index to ID
+        let correctOptionId = correctOption;
+        if (!correctOption.startsWith('opt-')) {
+            const correctOptionIndex = parseInt(correctOption);
+            if (isNaN(correctOptionIndex) || correctOptionIndex < 0 || correctOptionIndex >= options.length) {
+                return { error: "Invalid correct option index" };
+            }
+            correctOptionId = options[correctOptionIndex].id;
         }
 
         await prisma.question.update({
@@ -555,7 +596,7 @@ export async function updateQuestionAction(questionId: string, examId: string, f
             data: {
                 text,
                 options: JSON.stringify(options),
-                correctOption: options[parseInt(correctOption)].id,
+                correctOption: correctOptionId,
             }
         });
 
@@ -691,4 +732,46 @@ export async function reorderQuestionsAction(examId: string, questionIds: string
 
     revalidatePath(`/dashboard/exams/${examId}`);
     return { success: true };
+}
+
+export async function duplicateQuestionAction(questionId: string, examId: string) {
+    try {
+        const session = await verifySession();
+        if (!session) return { error: "Unauthorized" };
+
+        const exam = await prisma.exam.findUnique({
+            where: { id: examId },
+            select: { teacherId: true, status: true }
+        });
+
+        if (!exam) return { error: "Exam not found" };
+        if (exam.teacherId !== session.userId) return { error: "Unauthorized" };
+        if (exam.status === "PUBLISHED") return { error: "Cannot duplicate questions in published exam" };
+
+        const question = await prisma.question.findUnique({
+            where: { id: questionId }
+        });
+
+        if (!question) return { error: "Question not found" };
+
+        await prisma.question.create({
+            data: {
+                examId,
+                text: question.text,
+                options: question.options as any,
+                correctOption: question.correctOption,
+                marks: question.marks,
+                negativeMarks: question.negativeMarks,
+                timeLimit: question.timeLimit,
+                explanation: question.explanation,
+            }
+        });
+
+        revalidatePath(`/dashboard/exams/${examId}`);
+        return { success: true };
+
+    } catch (e) {
+        console.error(e);
+        return { error: "Failed to duplicate question" };
+    }
 }
