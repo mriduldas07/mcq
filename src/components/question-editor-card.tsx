@@ -25,6 +25,7 @@ import { updateQuestionAction, deleteQuestionAction, duplicateQuestionAction } f
 import { SaveToBankButton } from './save-to-bank-button';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import katex from 'katex';
 
 interface QuestionOption {
   id: string;
@@ -210,6 +211,35 @@ export function QuestionEditorCard({
     setOptions(options.map(opt => opt.id === id ? { ...opt, text } : opt));
   };
 
+  // Render math formulas on mount and when content changes
+  useEffect(() => {
+    if (isEditing) return; // Don't render during editing
+    
+    const renderMath = () => {
+      const elements = document.querySelectorAll('.math-rendered [data-latex]');
+      elements.forEach((element) => {
+        const latex = element.getAttribute('data-latex');
+        // Only render if not already rendered
+        if (latex && !element.querySelector('.katex')) {
+          try {
+            const html = katex.renderToString(latex, {
+              throwOnError: false,
+              displayMode: false,
+            });
+            element.innerHTML = html;
+          } catch (e) {
+            element.textContent = latex;
+          }
+        }
+      });
+    };
+
+    // Render immediately and after a short delay to catch any DOM updates
+    renderMath();
+    const timer = setTimeout(renderMath, 50);
+    return () => clearTimeout(timer);
+  }, [questionText, isEditing]);
+
   if (isPublished && !isEditing) {
     // Read-only view for published exams
     return (
@@ -227,7 +257,7 @@ export function QuestionEditorCard({
                 )}
               </div>
               <div 
-                className="text-sm prose prose-sm max-w-none"
+                className="text-sm prose prose-sm max-w-none math-rendered"
                 dangerouslySetInnerHTML={{ __html: questionText }}
               />
             </div>
@@ -341,10 +371,11 @@ export function QuestionEditorCard({
               onChange={setQuestionText}
               placeholder="Enter your question..."
               className="min-h-25"
+              showMath={true}
             />
           ) : (
             <div
-              className="text-sm p-3 border rounded-md cursor-pointer hover:bg-muted/30 transition-colors prose prose-sm max-w-none"
+              className="text-sm p-3 border rounded-md cursor-pointer hover:bg-muted/30 transition-colors prose prose-sm max-w-none math-rendered"
               onClick={() => setIsEditing(true)}
               dangerouslySetInnerHTML={{ __html: questionText }}
             />
@@ -370,32 +401,35 @@ export function QuestionEditorCard({
           </div>
           <div className="space-y-2">
             {options.map((opt, optIndex) => (
-              <div key={opt.id} className="flex items-center gap-2">
+              <div key={opt.id} className="flex items-start gap-2">
                 <input
                   type="radio"
                   name={`correct-${question.id}`}
                   checked={correctOption === opt.id}
                   onChange={() => setCorrectOption(opt.id)}
                   disabled={!isEditing || isPublished}
-                  className="h-4 w-4 shrink-0"
+                  className="h-4 w-4 shrink-0 mt-3"
                 />
                 {isEditing ? (
-                  <Input
-                    value={opt.text}
-                    onChange={(e) => updateOption(opt.id, e.target.value)}
-                    placeholder={`Option ${optIndex + 1}`}
-                    className="text-sm"
-                  />
+                  <div className="flex-1">
+                    <RichTextEditor
+                      content={opt.text}
+                      onChange={(value) => updateOption(opt.id, value)}
+                      placeholder={`Option ${optIndex + 1}`}
+                      className="min-h-[40px]"
+                      minimal={true}
+                      showMath={true}
+                    />
+                  </div>
                 ) : (
                   <div 
                     className={cn(
-                      'flex-1 p-2 rounded border text-sm cursor-pointer hover:bg-muted/30',
+                      'flex-1 p-2 rounded border text-sm cursor-pointer hover:bg-muted/30 math-rendered',
                       correctOption === opt.id && 'bg-green-50 border-green-300 dark:bg-green-950/20'
                     )}
                     onClick={() => setIsEditing(true)}
-                  >
-                    {opt.text}
-                  </div>
+                    dangerouslySetInnerHTML={{ __html: opt.text }}
+                  />
                 )}
                 {isEditing && options.length > 2 && (
                   <Button
@@ -479,7 +513,7 @@ export function QuestionEditorCard({
                   content={explanation}
                   onChange={setExplanation}
                   placeholder="Add an explanation for the correct answer..."
-                  className="min-h-[80px]"
+                  className="min-h-20"
                   minimal
                 />
               </div>

@@ -193,17 +193,6 @@ export default async function ExamEditorPage({
                         isPro={isPro}
                     />
 
-                    {exam.questions.length === 0 && exam.status !== 'PUBLISHED' && (
-                        <Card className="border-dashed border-2">
-                            <CardContent className="p-12 text-center">
-                                <p className="text-muted-foreground text-lg mb-2">No questions yet</p>
-                                <p className="text-sm text-muted-foreground">
-                                    Add your first question below ↓
-                                </p>
-                            </CardContent>
-                        </Card>
-                    )}
-
                     {/* Add New Question Form */}
                     {exam.status !== 'PUBLISHED' && (
                         <Card className="border-primary/30 shadow-sm">
@@ -212,6 +201,7 @@ export default async function ExamEditorPage({
                                     <CardTitle className="text-lg">Add New Question</CardTitle>
                                     <div className="flex gap-2">
                                         <BulkPasteDialog examId={examId} />
+                                        <BulkImportButton examId={examId} />
                                         <ImportFromBankButton examId={examId} />
                                     </div>
                                 </div>
@@ -245,16 +235,6 @@ export default async function ExamEditorPage({
                             scheduledEndTime={exam.scheduledEndTime}
                             allowLateSubmission={exam.allowLateSubmission}
                         />
-                        
-                        {/* Bulk Import */}
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-base">Bulk Import</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <BulkImportButton examId={examId} />
-                            </CardContent>
-                        </Card>
 
                         {/* Account Status */}
                         <Card className={isPro ? "border-primary/20 bg-primary/5" : ""}>
@@ -299,20 +279,6 @@ export default async function ExamEditorPage({
                                         </Link>
                                     </div>
                                 )}
-                            </CardContent>
-                        </Card>
-
-                        {/* Monetization */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-base">Monetization</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-2">
-                                <p className="text-sm text-muted-foreground">
-                                    Mode: <span className="font-medium text-foreground">
-                                        {exam.priceMode === 'FREE' ? 'Free (Subscription)' : 'Pay Per Exam'}
-                                    </span>
-                                </p>
                             </CardContent>
                         </Card>
                     </div>

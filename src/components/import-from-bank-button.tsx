@@ -17,9 +17,11 @@ export function ImportFromBankButton({ examId }: ImportFromBankButtonProps) {
       <Button
         type="button"
         variant="outline"
+        size="sm"
+        className="gap-2"
         onClick={() => setShowDialog(true)}
       >
-        <BookOpen className="h-4 w-4 mr-2" />
+        <BookOpen className="h-4 w-4" />
         From Bank
       </Button>
 

@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Sigma } from "lucide-react";
 import { RichTextEditor } from "@/components/rich-text-editor";
+import { MathLiveEditor } from "@/components/mathlive-editor";
 import { addQuestionAction } from "@/actions/exam";
 import { toast } from "sonner";
 
@@ -19,6 +20,7 @@ export function AddQuestionForm({ examId, isPro = false }: AddQuestionFormProps)
     const [options, setOptions] = useState(["", "", "", ""]);
     const [correctOption, setCorrectOption] = useState(0);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [editingMathOption, setEditingMathOption] = useState<number | null>(null);
 
     const handleAddOption = () => {
         if (options.length < 6) {
@@ -117,25 +119,58 @@ export function AddQuestionForm({ examId, isPro = false }: AddQuestionFormProps)
                 </div>
 
                 {options.map((option, i) => (
-                    <div key={i} className="flex items-start gap-2 min-w-0">
+                    <div key={i} className="flex items-center gap-2 min-w-0">
                         <input
                             type="radio"
                             name="correctOption"
                             checked={correctOption === i}
                             onChange={() => setCorrectOption(i)}
                             required
-                            className="h-4 w-4 shrink-0 mt-2.5 cursor-pointer"
+                            className="h-4 w-4 shrink-0 cursor-pointer"
                             title="Mark as correct answer"
                         />
-                        <div className="flex-1 min-w-0">
+                        {editingMathOption === i ? (
+                            <div className="flex-1 flex items-center gap-2 p-2 border rounded-md bg-muted/30">
+                                <MathLiveEditor
+                                    initialValue=""
+                                    onInsert={(latex) => {
+                                        const mathHtml = `<span class="math-formula" data-latex="${latex}"></span>`;
+                                        const currentText = option.replace(/<span class="math-formula"[^>]*>.*?<\/span>/g, '').trim();
+                                        const newValue = currentText ? currentText + ' ' + mathHtml : mathHtml;
+                                        handleOptionChange(i, newValue);
+                                        setEditingMathOption(null);
+                                    }}
+                                    onCancel={() => setEditingMathOption(null)}
+                                    inline={true}
+                                />
+                            </div>
+                        ) : (
                             <Input
-                                value={option}
-                                onChange={(e) => handleOptionChange(i, e.target.value)}
+                                value={option.replace(/<span class="math-formula"[^>]*>.*?<\/span>/g, '').trim()}
+                                onChange={(e) => {
+                                    const mathFormulas = option.match(/<span class="math-formula"[^>]*>.*?<\/span>/g) || [];
+                                    const newValue = mathFormulas.length > 0 
+                                        ? e.target.value + ' ' + mathFormulas.join(' ')
+                                        : e.target.value;
+                                    handleOptionChange(i, newValue);
+                                }}
                                 placeholder={`Option ${String.fromCharCode(65 + i)}`}
                                 required
-                                className="text-sm"
+                                className="flex-1"
                             />
-                        </div>
+                        )}
+                        {isPro && editingMathOption !== i && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setEditingMathOption(i)}
+                                className="shrink-0 h-10 px-3"
+                                title="Add math formula"
+                            >
+                                <Sigma className="h-4 w-4" />
+                            </Button>
+                        )}
                         {options.length > 2 && (
                             <Button
                                 type="button"

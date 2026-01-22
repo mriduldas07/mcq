@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { Clock, AlertCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { submitExamAction, saveAnswerAction, getAttemptStatusAction, recordViolationAction, beginExamTimerAction } from "@/actions/student";
+import { renderMathInElement } from "@/lib/math-renderer";
 
 // Types
 type Option = {
@@ -76,6 +77,20 @@ export function ExamSession({
     const [isOnline, setIsOnline] = useState(true);
     const [pendingSaves, setPendingSaves] = useState<string[]>([]);
     const syncQueueRef = useRef<Array<{ questionId: string; answer: string }>>([]);
+    
+    // Ref for math rendering
+    const questionRef = useRef<HTMLDivElement>(null);
+    const optionsRef = useRef<HTMLDivElement>(null);
+
+    // Render math formulas when question changes
+    useEffect(() => {
+        if (questionRef.current) {
+            renderMathInElement(questionRef.current);
+        }
+        if (optionsRef.current) {
+            renderMathInElement(optionsRef.current);
+        }
+    }, [currentQuestionIndex]);
 
     // =================================================================
     // INITIALIZATION: Check if exam has already started (page refresh)
@@ -608,11 +623,13 @@ export function ExamSession({
                                     Question {currentQuestionIndex + 1} of {questions.length}
                                 </span>
                             </div>
-                            <CardTitle className="text-sm sm:text-base md:text-[17px] lg:text-[19px] font-medium leading-[1.65]">
-                                {currentQuestion.text}
-                            </CardTitle>
+                            <CardTitle 
+                                ref={questionRef}
+                                className="text-sm sm:text-base md:text-[17px] lg:text-[19px] font-medium leading-[1.65]"
+                                dangerouslySetInnerHTML={{ __html: currentQuestion.text }}
+                            />
                         </CardHeader>
-                        <CardContent className="flex-1 pt-2 px-4 sm:px-6">
+                        <CardContent className="flex-1 pt-2 px-4 sm:px-6" ref={optionsRef}>
                             <RadioGroup
                                 value={answers[currentQuestion.id] || ""}
                                 onValueChange={(val: string) => handleOptionSelect(currentQuestion.id, val)}
@@ -631,9 +648,11 @@ export function ExamSession({
                                         onClick={() => handleOptionSelect(currentQuestion.id, opt.id)}
                                     >
                                         <RadioGroupItem value={opt.id} id={opt.id} className="shrink-0" />
-                                        <Label htmlFor={opt.id} className="flex-1 cursor-pointer font-normal text-sm sm:text-[15px] md:text-base leading-[1.6]">
-                                            {opt.text}
-                                        </Label>
+                                        <Label 
+                                            htmlFor={opt.id} 
+                                            className="flex-1 cursor-pointer font-normal text-sm sm:text-[15px] md:text-base leading-[1.6]"
+                                            dangerouslySetInnerHTML={{ __html: opt.text }}
+                                        />
                                     </div>
                                 ))}
                             </RadioGroup>

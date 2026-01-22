@@ -10,12 +10,11 @@ import Italic from '@tiptap/extension-italic';
 import Underline from '@tiptap/extension-underline';
 import BulletList from '@tiptap/extension-bullet-list';
 import ListItem from '@tiptap/extension-list-item';
-import { Math } from '@/lib/tiptap-math';
-import { useEffect } from 'react';
+import { MathLive } from '@/lib/tiptap-mathlive';
+import { useEffect, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { Bold as BoldIcon, Italic as ItalicIcon, Underline as UnderlineIcon, List, Sigma } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { MathFormulaButton } from './math-formula-button';
 import katex from 'katex';
 
 interface RichTextEditorProps {
@@ -26,6 +25,7 @@ interface RichTextEditorProps {
   editable?: boolean;
   minimal?: boolean;
   showMath?: boolean;
+  editorRef?: (editor: any) => void;
 }
 
 export function RichTextEditor({
@@ -36,7 +36,16 @@ export function RichTextEditor({
   editable = true,
   minimal = false,
   showMath = false,
+  editorRef,
 }: RichTextEditorProps) {
+  // Sanitize content once to remove any inner content from math formulas
+  const sanitizedContent = useMemo(() => {
+    return content.replace(
+      /<span([^>]*data-latex="[^"]*"[^>]*)>.*?<\/span>/gi,
+      '<span$1></span>'
+    );
+  }, [content]);
+
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -52,7 +61,7 @@ export function RichTextEditor({
       Underline,
       BulletList,
       ListItem,
-      Math,
+      MathLive,
       Image.configure({
         inline: true,
         allowBase64: true,
@@ -67,7 +76,7 @@ export function RichTextEditor({
         placeholder,
       }),
     ],
-    content,
+    content: sanitizedContent,
     editable,
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
@@ -84,47 +93,20 @@ export function RichTextEditor({
   });
 
   useEffect(() => {
-    if (editor && content !== editor.getHTML()) {
-      editor.commands.setContent(content);
+    if (editor && sanitizedContent !== editor.getHTML()) {
+      editor.commands.setContent(sanitizedContent);
     }
-  }, [content, editor]);
+  }, [sanitizedContent, editor]);
 
-  // Render math formulas in the content
   useEffect(() => {
+    if (editor && editorRef) {
+      editorRef(editor);
+    }
+  }, [editor, editorRef]);
+
+  const handleInsertEquation = () => {
     if (!editor) return;
-
-    const renderMath = () => {
-      const elements = document.querySelectorAll('.math-formula[data-latex]');
-      elements.forEach((element) => {
-        const latex = element.getAttribute('data-latex');
-        if (latex) {
-          try {
-            const html = katex.renderToString(latex, {
-              throwOnError: false,
-              displayMode: false,
-            });
-            element.innerHTML = html;
-          } catch (e) {
-            element.textContent = latex;
-          }
-        }
-      });
-    };
-
-    renderMath();
-    editor.on('update', renderMath);
-
-    return () => {
-      editor.off('update', renderMath);
-    };
-  }, [editor]);
-
-  const handleMathInsert = (latex: string) => {
-    if (!editor) return;
-    
-    // Insert inline math
-    const html = `<span class="math-formula" data-latex="${latex}"></span>&nbsp;`;
-    editor.chain().focus().insertContent(html).run();
+    editor.chain().focus().insertMathLive().run();
   };
 
   if (!editor) {
@@ -133,49 +115,60 @@ export function RichTextEditor({
 
   return (
     <div className="border rounded-md focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
-      {editable && !minimal && editor.isActive && (
+      {editable && editor.isActive && (
         <div className="border-b bg-muted/30 p-2 flex gap-1 flex-wrap">
-          <Button
-            type="button"
-            variant={editor.isActive('bold') ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => editor.chain().focus().toggleBold().run()}
-            className="h-8 px-2"
-          >
-            <BoldIcon className="h-4 w-4" />
-          </Button>
-          <Button
-            type="button"
-            variant={editor.isActive('italic') ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => editor.chain().focus().toggleItalic().run()}
-            className="h-8 px-2"
-          >
-            <ItalicIcon className="h-4 w-4" />
-          </Button>
-          <Button
-            type="button"
-            variant={editor.isActive('underline') ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => editor.chain().focus().toggleUnderline().run()}
-            className="h-8 px-2"
-          >
-            <UnderlineIcon className="h-4 w-4" />
-          </Button>
-          <Button
-            type="button"
-            variant={editor.isActive('bulletList') ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => editor.chain().focus().toggleBulletList().run()}
-            className="h-8 px-2"
-          >
-            <List className="h-4 w-4" />
-          </Button>
+          {!minimal && (
+            <>
+              <Button
+                type="button"
+                variant={editor.isActive('bold') ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => editor.chain().focus().toggleBold().run()}
+                className="h-8 px-2"
+              >
+                <BoldIcon className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                variant={editor.isActive('italic') ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => editor.chain().focus().toggleItalic().run()}
+                className="h-8 px-2"
+              >
+                <ItalicIcon className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                variant={editor.isActive('underline') ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => editor.chain().focus().toggleUnderline().run()}
+                className="h-8 px-2"
+              >
+                <UnderlineIcon className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                variant={editor.isActive('bulletList') ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => editor.chain().focus().toggleBulletList().run()}
+                className="h-8 px-2"
+              >
+                <List className="h-4 w-4" />
+              </Button>
+            </>
+          )}
           
           {showMath && (
-            <div className="ml-1">
-              <MathFormulaButton onInsert={handleMathInsert} />
-            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleInsertEquation}
+              className="h-8 px-2 gap-1"
+            >
+              <Sigma className="h-4 w-4" />
+              <span className="text-xs">Equation</span>
+            </Button>
           )}
         </div>
       )}

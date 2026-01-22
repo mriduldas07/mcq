@@ -130,7 +130,7 @@ export function BulkPasteDialog({ examId }: BulkPasteDialogProps) {
 
   return (
     <>
-      <Button variant="outline" size="sm" className="w-full gap-2" onClick={() => setOpen(true)}>
+      <Button variant="outline" size="sm" className="gap-2" onClick={() => setOpen(true)}>
         <FileText className="h-4 w-4" />
         Quick Paste
       </Button>

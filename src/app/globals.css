@@ -1,5 +1,6 @@
 @config "../../tailwind.config.js";
 @import "tailwindcss";
+@import "katex/dist/katex.min.css";
 
 
 @layer base {
@@ -386,4 +387,81 @@
 .katex-display {
   margin: 1em 0;
   text-align: center;
+}
+
+/* MathLive Editor Styles */
+.mathlive-field {
+  font-family: inherit;
+  background-color: #ffffff !important;
+  color: #000000 !important;
+}
+
+.mathlive-field * {
+  background-color: transparent !important;
+}
+
+.dark .mathlive-field {
+  background-color: #1a1a1a !important;
+  color: #ffffff !important;
+}
+
+.mathlive-field:focus-within {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+.math-live-wrapper {
+  display: inline;
+}
+
+.math-formula-rendered {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* Math display in option inputs */
+.math-display-area {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.math-display-area .math-formula {
+  display: inline-block !important;
+  padding: 0.25rem 0.5rem;
+  background-color: hsl(var(--muted));
+  border-radius: 0.25rem;
+  visibility: visible !important;
+}
+
+.math-display-area .katex {
+  font-size: 1em;
+}
+
+/* Hide all text nodes in math display area except rendered math */
+.math-display-area {
+  font-size: 0; /* Hide text nodes */
+}
+
+.math-display-area .math-formula {
+  font-size: 1rem; /* Restore font size for math */
+}
+
+.math-display-area .katex-html {
+  display: inline-block;
+}
+
+/* MathLive virtual keyboard customization */
+.ML__keyboard {
+  --keyboard-zindex: 1000;
+  --keycap-height: 48px;
+  --keycap-font-size: 20px;
+  --keycap-secondary-font-size: 14px;
+}
+
+@media (max-width: 640px) {
+  .ML__keyboard {
+    --keycap-height: 56px;
+    --keycap-font-size: 24px;
+  }
 }
