@@ -216,7 +216,10 @@ export function QuestionEditorCard({
     if (isEditing) return; // Don't render during editing
     
     const renderMath = () => {
-      const elements = document.querySelectorAll('.math-rendered [data-latex]');
+      const cardElement = document.getElementById(`question-card-${question.id}`);
+      if (!cardElement) return;
+      
+      const elements = cardElement.querySelectorAll('.math-rendered [data-latex]');
       elements.forEach((element) => {
         const latex = element.getAttribute('data-latex');
         // Only render if not already rendered
@@ -238,7 +241,7 @@ export function QuestionEditorCard({
     renderMath();
     const timer = setTimeout(renderMath, 50);
     return () => clearTimeout(timer);
-  }, [questionText, isEditing]);
+  }, [questionText, options, isEditing, question.id]);
 
   if (isPublished && !isEditing) {
     // Read-only view for published exams
@@ -286,7 +289,7 @@ export function QuestionEditorCard({
   }
 
   return (
-    <Card className="relative">
+    <Card className="relative" id={`question-card-${question.id}`}>
       <CardHeader className="p-3 sm:p-4">
         <div className="flex justify-between items-start gap-2">
           <div className="flex items-center gap-2">
@@ -416,7 +419,7 @@ export function QuestionEditorCard({
                       content={opt.text}
                       onChange={(value) => updateOption(opt.id, value)}
                       placeholder={`Option ${optIndex + 1}`}
-                      className="min-h-[40px]"
+                      className="min-h-10"
                       minimal={true}
                       showMath={true}
                     />

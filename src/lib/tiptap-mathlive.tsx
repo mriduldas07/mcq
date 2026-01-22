@@ -4,6 +4,16 @@ import { MathLiveEditor } from '@/components/mathlive-editor';
 import { useEffect, useState } from 'react';
 import katex from 'katex';
 
+// Escape HTML to prevent XSS
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export interface MathLiveOptions {
   HTMLAttributes: Record<string, any>;
 }
@@ -33,7 +43,7 @@ const MathLiveComponent = ({ node, updateAttributes, deleteNode, editor }: any) 
         setRenderedHTML(html);
       } catch (e) {
         console.warn('KaTeX rendering error:', e);
-        setRenderedHTML(latex);
+        setRenderedHTML(escapeHtml(latex));
       }
     }
   }, [latex, isEditing]);

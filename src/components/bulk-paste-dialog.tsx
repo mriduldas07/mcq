@@ -172,7 +172,7 @@ Answer: C`}
               value={pastedText}
               onChange={(e) => setPastedText(e.target.value)}
               placeholder="Paste questions in the format shown above..."
-              className="min-h-[200px] font-mono text-sm"
+              className="min-h-50 font-mono text-sm"
             />
           </div>
 
@@ -186,7 +186,7 @@ Answer: C`}
               <h4 className="font-medium text-sm">
                 Preview ({parsedQuestions.length} questions)
               </h4>
-              <div className="space-y-3 max-h-[300px] overflow-y-auto">
+              <div className="space-y-3 max-h-75 overflow-y-auto">
                 {parsedQuestions.map((q, idx) => (
                   <div key={idx} className="border rounded-md p-3 bg-muted/50">
                     <p className="font-medium text-sm mb-2">Q{idx + 1}. {q.text}</p>

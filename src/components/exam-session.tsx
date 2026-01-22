@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import DOMPurify from 'isomorphic-dompurify';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -626,7 +627,7 @@ export function ExamSession({
                             <CardTitle 
                                 ref={questionRef}
                                 className="text-sm sm:text-base md:text-[17px] lg:text-[19px] font-medium leading-[1.65]"
-                                dangerouslySetInnerHTML={{ __html: currentQuestion.text }}
+                                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(currentQuestion.text) }}
                             />
                         </CardHeader>
                         <CardContent className="flex-1 pt-2 px-4 sm:px-6" ref={optionsRef}>
@@ -640,7 +641,7 @@ export function ExamSession({
                                     <div
                                         key={opt.id}
                                         className={cn(
-                                            "flex items-center space-x-2 sm:space-x-3 border rounded-lg p-3 sm:p-4 transition-all min-h-[48px] sm:min-h-[52px]",
+                                            "flex items-center space-x-2 sm:space-x-3 border rounded-lg p-3 sm:p-4 transition-all min-h-12 sm:min-h-13",
                                             examState === ExamState.RUNNING && "cursor-pointer hover:bg-accent",
                                             examState === ExamState.ENDED && "opacity-60",
                                             answers[currentQuestion.id] === opt.id ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-input"
@@ -651,7 +652,7 @@ export function ExamSession({
                                         <Label 
                                             htmlFor={opt.id} 
                                             className="flex-1 cursor-pointer font-normal text-sm sm:text-[15px] md:text-base leading-[1.6]"
-                                            dangerouslySetInnerHTML={{ __html: opt.text }}
+                                            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(opt.text) }}
                                         />
                                     </div>
                                 ))}

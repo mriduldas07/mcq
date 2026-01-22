@@ -25,12 +25,23 @@ export function MathLiveEditor({
 }: MathLiveEditorProps) {
   const mathfieldRef = useRef<HTMLElement>(null);
   const [isReady, setIsReady] = useState(false);
+  const onInsertRef = useRef(onInsert);
+  
+  // Keep onInsert ref up to date
+  useEffect(() => {
+    onInsertRef.current = onInsert;
+  }, [onInsert]);
 
   useEffect(() => {
     // Dynamically import MathLive web component
-    import("mathlive").then(() => {
-      setIsReady(true);
-    });
+    import("mathlive")
+      .then(() => {
+        setIsReady(true);
+      })
+      .catch((error) => {
+        console.error('Failed to load MathLive:', error);
+        setIsReady(false);
+      });
   }, []);
 
   useEffect(() => {
@@ -175,6 +186,7 @@ export function MathLiveEditor({
           variant="default"
           onClick={handleInsert}
           className="h-7 px-2"
+          aria-label="Confirm and insert formula"
         >
           <Check className="h-3.5 w-3.5" />
         </Button>
@@ -184,6 +196,7 @@ export function MathLiveEditor({
           variant="ghost"
           onClick={onCancel}
           className="h-7 px-2"
+          aria-label="Cancel"
         >
           <X className="h-3.5 w-3.5" />
         </Button>

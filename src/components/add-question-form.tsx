@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +9,16 @@ import { RichTextEditor } from "@/components/rich-text-editor";
 import { MathLiveEditor } from "@/components/mathlive-editor";
 import { addQuestionAction } from "@/actions/exam";
 import { toast } from "sonner";
+
+// Escape HTML attribute values to prevent XSS
+function escapeHtmlAttr(str: string): string {
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
 
 interface AddQuestionFormProps {
     examId: string;
@@ -134,7 +144,8 @@ export function AddQuestionForm({ examId, isPro = false }: AddQuestionFormProps)
                                 <MathLiveEditor
                                     initialValue=""
                                     onInsert={(latex) => {
-                                        const mathHtml = `<span class="math-formula" data-latex="${latex}"></span>`;
+                                        const escapedLatex = escapeHtmlAttr(latex);
+                                        const mathHtml = `<span class="math-formula" data-latex="${escapedLatex}"></span>`;
                                         const currentText = option.replace(/<span class="math-formula"[^>]*>.*?<\/span>/g, '').trim();
                                         const newValue = currentText ? currentText + ' ' + mathHtml : mathHtml;
                                         handleOptionChange(i, newValue);

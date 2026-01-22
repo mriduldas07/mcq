@@ -1,4 +1,5 @@
 import katex from 'katex';
+import DOMPurify from 'isomorphic-dompurify';
 
 /**
  * Renders math formulas in HTML content using KaTeX
@@ -12,7 +13,7 @@ export function renderMathInHTML(html: string): string {
   }
 
   const tempDiv = document.createElement('div');
-  tempDiv.innerHTML = html;
+  tempDiv.innerHTML = DOMPurify.sanitize(html);
 
   // Find all elements with data-latex attribute
   const mathElements = tempDiv.querySelectorAll('[data-latex]');

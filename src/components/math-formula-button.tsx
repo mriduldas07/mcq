@@ -297,7 +297,7 @@ export function MathFormulaButton({ onInsert, disabled }: MathFormulaButtonProps
                   className="text-lg font-serif"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Tips: Use ^ for superscript (x^2), _ for subscript (x_n), / will be converted to fraction
+                  Tips: Use ^ for superscript (x^2), _ for subscript (x_n). For fractions, use \frac{'{'}a{'}'}{'{'} b{'}'} or the Structures tab.
                 </p>
               </div>
             </TabsContent>
@@ -306,7 +306,7 @@ export function MathFormulaButton({ onInsert, disabled }: MathFormulaButtonProps
           {/* Preview - Always visible */}
           <div className="space-y-2 mt-4 pt-4 border-t">
             <Label>Preview</Label>
-            <div className="min-h-[80px] p-4 border-2 rounded-md bg-white dark:bg-gray-900 flex items-center justify-center">
+            <div className="min-h-20 p-4 border-2 rounded-md bg-white dark:bg-gray-900 flex items-center justify-center">
               {preview ? (
                 <div
                   className="text-3xl"

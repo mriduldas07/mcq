@@ -115,7 +115,7 @@ export function RichTextEditor({
 
   return (
     <div className="border rounded-md focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
-      {editable && editor.isActive && (
+      {editable && (
         <div className="border-b bg-muted/30 p-2 flex gap-1 flex-wrap">
           {!minimal && (
             <>
