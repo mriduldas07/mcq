@@ -11,6 +11,7 @@ import { Clock, AlertCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { submitExamAction, saveAnswerAction, getAttemptStatusAction, recordViolationAction, beginExamTimerAction } from "@/actions/student";
 import { renderMathInElement } from "@/lib/math-renderer";
+import { toast } from "sonner";
 
 // Types
 type Option = {
@@ -297,18 +298,12 @@ export function ExamSession({
         
         const handleVisibilityChange = async () => {
             if (document.hidden) {
-                // Tab switched away - record violation
                 console.log(`⚠️ Tab switch detected`);
-                
                 try {
-                    const result = await recordViolationAction(attemptId);
-                    
+                    const result = await recordViolationAction(attemptId, "TAB_SWITCH");
                     if (result.success && result.violations !== undefined) {
                         setViolations(result.violations);
-                        console.log(`Violation recorded. Count: ${result.violations}/${maxViolations}`);
-                        
                         if (result.violations >= maxViolations && !hasAutoSubmitted.current) {
-                            console.log(`🚨 TAB SWITCH - EXCEEDED LIMIT - AUTO-SUBMIT`);
                             hasAutoSubmitted.current = true;
                             handleSubmit(true);
                         }
@@ -321,7 +316,32 @@ export function ExamSession({
 
         document.addEventListener("visibilitychange", handleVisibilityChange);
         return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [examState, antiCheatEnabled, attemptId, maxViolations]);
+
+    // =================================================================
+    // ANTI-CHEAT: Window focus loss detection (NEVER PAUSES TIMER)
+    // =================================================================
+    useEffect(() => {
+        if (!antiCheatEnabled || examState !== ExamState.RUNNING) return;
+        
+        const handleBlur = async () => {
+            console.log(`⚠️ Focus lost (Alt+Tab or click outside)`);
+            try {
+                const result = await recordViolationAction(attemptId, "FOCUS_LOST");
+                if (result.success && result.violations !== undefined) {
+                    setViolations(result.violations);
+                    if (result.violations >= maxViolations && !hasAutoSubmitted.current) {
+                        hasAutoSubmitted.current = true;
+                        handleSubmit(true);
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to record focus lost violation", e);
+            }
+        };
+
+        window.addEventListener("blur", handleBlur);
+        return () => window.removeEventListener("blur", handleBlur);
     }, [examState, antiCheatEnabled, attemptId, maxViolations]);
 
     // =================================================================
@@ -332,18 +352,12 @@ export function ExamSession({
         
         const handleFullscreenChange = async () => {
             if (!document.fullscreenElement) {
-                // User exited fullscreen - record violation
                 console.log(`⚠️ Fullscreen exit detected`);
-                
                 try {
-                    const result = await recordViolationAction(attemptId);
-                    
+                    const result = await recordViolationAction(attemptId, "FULLSCREEN_EXIT");
                     if (result.success && result.violations !== undefined) {
                         setViolations(result.violations);
-                        console.log(`Violation recorded. Count: ${result.violations}/${maxViolations}`);
-                        
                         if (result.violations >= maxViolations && !hasAutoSubmitted.current) {
-                            console.log(`🚨 FULLSCREEN EXIT - EXCEEDED LIMIT - AUTO-SUBMIT`);
                             hasAutoSubmitted.current = true;
                             handleSubmit(true);
                         }
@@ -356,7 +370,117 @@ export function ExamSession({
 
         document.addEventListener("fullscreenchange", handleFullscreenChange);
         return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [examState, antiCheatEnabled, attemptId, maxViolations]);
+
+    // =================================================================
+    // ANTI-CHEAT: Prevent copy/cut/paste and record violations
+    // =================================================================
+    useEffect(() => {
+        if (!antiCheatEnabled || examState !== ExamState.RUNNING) return;
+
+        const handleCopy = async (e: ClipboardEvent) => {
+            e.preventDefault();
+            toast.error("Copying text is prohibited during the exam!");
+            try {
+                const result = await recordViolationAction(attemptId, "COPY_ATTEMPT");
+                if (result.success && result.violations !== undefined) {
+                    setViolations(result.violations);
+                    if (result.violations >= maxViolations && !hasAutoSubmitted.current) {
+                        hasAutoSubmitted.current = true;
+                        handleSubmit(true);
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to record copy violation", e);
+            }
+        };
+
+        const handlePaste = async (e: ClipboardEvent) => {
+            e.preventDefault();
+            toast.error("Pasting text is prohibited during the exam!");
+            try {
+                const result = await recordViolationAction(attemptId, "PASTE_ATTEMPT");
+                if (result.success && result.violations !== undefined) {
+                    setViolations(result.violations);
+                    if (result.violations >= maxViolations && !hasAutoSubmitted.current) {
+                        hasAutoSubmitted.current = true;
+                        handleSubmit(true);
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to record paste violation", e);
+            }
+        };
+
+        document.addEventListener("copy", handleCopy);
+        document.addEventListener("cut", handleCopy);
+        document.addEventListener("paste", handlePaste);
+
+        return () => {
+            document.removeEventListener("copy", handleCopy);
+            document.removeEventListener("cut", handleCopy);
+            document.removeEventListener("paste", handlePaste);
+        };
+    }, [examState, antiCheatEnabled, attemptId, maxViolations]);
+
+    // =================================================================
+    // ANTI-CHEAT: Prevent right-click and record violations
+    // =================================================================
+    useEffect(() => {
+        if (!antiCheatEnabled || examState !== ExamState.RUNNING) return;
+
+        const handleContextMenu = async (e: MouseEvent) => {
+            e.preventDefault();
+            toast.error("Right-clicking is prohibited during the exam!");
+            try {
+                const result = await recordViolationAction(attemptId, "RIGHT_CLICK");
+                if (result.success && result.violations !== undefined) {
+                    setViolations(result.violations);
+                    if (result.violations >= maxViolations && !hasAutoSubmitted.current) {
+                        hasAutoSubmitted.current = true;
+                        handleSubmit(true);
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to record right-click violation", e);
+            }
+        };
+
+        document.addEventListener("contextmenu", handleContextMenu);
+        return () => document.removeEventListener("contextmenu", handleContextMenu);
+    }, [examState, antiCheatEnabled, attemptId, maxViolations]);
+
+    // =================================================================
+    // ANTI-CHEAT: Block DevTools shortcuts and record violations
+    // =================================================================
+    useEffect(() => {
+        if (!antiCheatEnabled || examState !== ExamState.RUNNING) return;
+
+        const handleKeyDown = async (e: KeyboardEvent) => {
+            const isDevTools = 
+                e.key === "F12" ||
+                (e.ctrlKey && e.shiftKey && (e.key === "I" || e.key === "J" || e.key === "C" || e.key === "i" || e.key === "j" || e.key === "c"));
+
+            if (isDevTools) {
+                e.preventDefault();
+                toast.error("Accessing developer tools is strictly prohibited!");
+                try {
+                    const result = await recordViolationAction(attemptId, "CONSOLE_OPENED");
+                    if (result.success && result.violations !== undefined) {
+                        setViolations(result.violations);
+                        if (result.violations >= maxViolations && !hasAutoSubmitted.current) {
+                            hasAutoSubmitted.current = true;
+                            handleSubmit(true);
+                        }
+                    }
+                } catch (e) {
+                    console.error("Failed to record DevTools violation", e);
+                }
+            }
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
     }, [examState, antiCheatEnabled, attemptId, maxViolations]);
 
     // =================================================================

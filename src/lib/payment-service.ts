@@ -57,6 +57,79 @@ const SubscriptionStatus = (() => {
 
 export const PaymentService = {
     /**
+     * Reconcile/self-heal subscription status in the database.
+     * If the period has ended and the planType is still PRO, downgrade them.
+     */
+    async reconcileSubscription(userId: string): Promise<{
+        planType: 'FREE' | 'PRO';
+        subscriptionStatus: string;
+        currentPeriodEnd: Date | null;
+    }> {
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+                planType: true,
+                subscriptionStatus: true,
+                currentPeriodEnd: true,
+            },
+        });
+
+        if (!user) {
+            return {
+                planType: 'FREE',
+                subscriptionStatus: 'NONE',
+                currentPeriodEnd: null,
+            };
+        }
+
+        const now = new Date();
+        const isExpired = user.currentPeriodEnd && now > user.currentPeriodEnd;
+
+        if (isExpired && (user.planType === 'PRO' || user.subscriptionStatus !== 'NONE')) {
+            console.log(`[Reconcile] User ${userId} subscription ended on ${user.currentPeriodEnd}. Downgrading to FREE.`);
+            
+            // Update User record
+            await prisma.user.update({
+                where: { id: userId },
+                data: {
+                    planType: 'FREE',
+                    subscriptionStatus: 'NONE',
+                },
+            });
+
+            // Update Subscription table if there's an active one that expired
+            const latestSub = await prisma.subscription.findFirst({
+                where: { userId },
+                orderBy: { currentPeriodEnd: 'desc' },
+            });
+
+            if (latestSub && (latestSub.status === 'ACTIVE' || latestSub.status === 'CANCELLED') && !latestSub.cancelAtPeriodEnd) {
+                await prisma.subscription.update({
+                    where: { id: latestSub.id },
+                    data: { status: 'EXPIRED' },
+                });
+            } else if (latestSub && latestSub.status === 'ACTIVE') {
+                await prisma.subscription.update({
+                    where: { id: latestSub.id },
+                    data: { status: 'EXPIRED' },
+                });
+            }
+
+            return {
+                planType: 'FREE',
+                subscriptionStatus: 'NONE',
+                currentPeriodEnd: user.currentPeriodEnd,
+            };
+        }
+
+        return {
+            planType: user.planType as 'FREE' | 'PRO',
+            subscriptionStatus: user.subscriptionStatus,
+            currentPeriodEnd: user.currentPeriodEnd,
+        };
+    },
+
+    /**
      * Check if user can publish an exam
      * Priority order: PRO subscription > One-time credits > Free quota
      * @returns { canPublish: boolean, reason?: string, examMode: 'FREE'|'PRO'|'ONE_TIME' }
@@ -68,6 +141,9 @@ export const PaymentService = {
         freeExamsRemaining?: number;
         oneTimeExamsRemaining?: number;
     }> {
+        // Self-heal/reconcile subscription first
+        await this.reconcileSubscription(userId);
+
         const user = await prisma.user.findUnique({
             where: { id: userId },
             select: {
@@ -245,6 +321,9 @@ export const PaymentService = {
      * Uses User-level fields for fast access (single source of truth sync)
      */
     async hasActiveProSubscription(userId: string): Promise<boolean> {
+        // Self-heal/reconcile subscription first
+        await this.reconcileSubscription(userId);
+
         const user = await prisma.user.findUnique({
             where: { id: userId },
             select: {
@@ -269,6 +348,9 @@ export const PaymentService = {
      * Returns comprehensive billing status
      */
     async getSubscriptionDetails(userId: string) {
+        // Self-heal/reconcile subscription first
+        await this.reconcileSubscription(userId);
+
         const user = await prisma.user.findUnique({
             where: { id: userId },
             select: {

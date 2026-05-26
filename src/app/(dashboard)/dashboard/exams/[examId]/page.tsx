@@ -16,6 +16,7 @@ import { AddQuestionForm } from "@/components/add-question-form";
 import { BulkPasteDialog } from "@/components/bulk-paste-dialog";
 import { verifySession } from "@/lib/session";
 import { Prisma } from "@prisma/client";
+import { PaymentService } from "@/lib/payment-service";
 import Link from "next/link";
 
 type ExamWithQuestions = Prisma.ExamGetPayload<{
@@ -85,7 +86,7 @@ export default async function ExamEditorPage({
         }])
     );
 
-    const isPro = user?.planType === "PRO";
+    const isPro = await PaymentService.hasActiveProSubscription(session.userId);
     const freeExamsRemaining = user ? Math.max(0, 3 - (user.freeExamsUsed || 0)) : 0;
     const oneTimeExamsRemaining = user?.oneTimeExamsRemaining || 0;
     const canPublish = isPro || freeExamsRemaining > 0 || oneTimeExamsRemaining > 0;

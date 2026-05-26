@@ -426,7 +426,10 @@ export async function getAttemptStatusAction(attemptId: string) {
  * Increments violation count and calculates trust score
  * ONLY records violations if exam has started (startedAt is set)
  */
-export async function recordViolationAction(attemptId: string) {
+export async function recordViolationAction(
+    attemptId: string, 
+    eventType: "TAB_SWITCH" | "FULLSCREEN_EXIT" | "FOCUS_LOST" | "FOCUS_GAINED" | "COPY_ATTEMPT" | "PASTE_ATTEMPT" | "RIGHT_CLICK" | "CONSOLE_OPENED" = "TAB_SWITCH"
+) {
     try {
         const attempt = await prisma.studentAttempt.findUnique({
             where: { id: attemptId },
@@ -462,13 +465,22 @@ export async function recordViolationAction(attemptId: string) {
         // Calculate trust score (100 - violations * 20, minimum 0)
         const trustScore = Math.max(0, 100 - (newViolations * 20));
 
-        await prisma.studentAttempt.update({
-            where: { id: attemptId },
-            data: {
-                violations: newViolations,
-                trustScore,
-            },
-        });
+        // Use transaction to update attempt and create event
+        await prisma.$transaction([
+            prisma.studentAttempt.update({
+                where: { id: attemptId },
+                data: {
+                    violations: newViolations,
+                    trustScore,
+                },
+            }),
+            prisma.integrityEvent.create({
+                data: {
+                    attemptId,
+                    eventType,
+                }
+            })
+        ]);
 
         // Check if max violations exceeded
         const forceSubmit = newViolations >= attempt.exam.maxViolations;

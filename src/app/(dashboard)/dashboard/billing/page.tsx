@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { verifySession } from "@/lib/session";
 import { redirect } from "next/navigation";
 import { BillingClient } from "@/components/billing-client";
+import { PaymentService } from "@/lib/payment-service";
 
 // Import SubscriptionStatusType with fallback for before migration
 const SubscriptionStatusType = (() => {
@@ -31,6 +32,9 @@ export default async function BillingPage() {
     if (!session) return redirect("/login");
 
     try {
+        // Reconcile subscription status first (self-healing)
+        await PaymentService.reconcileSubscription(session.userId);
+
         // Fetch user with subscription and payment data
         // Using User-level subscriptionStatus for quick access (single source of truth)
         const user = await prisma.user.findUnique({
@@ -85,7 +89,7 @@ export default async function BillingPage() {
             (subscriptionStatus === SubscriptionStatusType.ACTIVE || subscriptionStatus === SubscriptionStatusType.CANCELED) &&
             user.currentPeriodEnd && 
             new Date() <= user.currentPeriodEnd
-        ) || user.planType === "PRO";
+        ) || (user.planType === "PRO" && (!user.currentPeriodEnd || new Date() <= user.currentPeriodEnd));
 
         return (
             <BillingClient

@@ -4,6 +4,7 @@ import { UserAccountNav } from "@/components/user-account-nav";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { verifySessionWithDbCheck } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
+import { PaymentService } from "@/lib/payment-service";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 
@@ -35,6 +36,9 @@ export default async function DashboardLayout({
     
     // Session is valid
     const session = sessionResult.session;
+
+    // Reconcile subscription status first
+    await PaymentService.reconcileSubscription(session.userId);
 
     // Fetch full user data (we already know user exists from verifySessionWithDbCheck)
     const user = await prisma.user.findUnique({

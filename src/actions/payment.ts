@@ -481,6 +481,9 @@ export async function getUserBillingStatusAction() {
             return { error: "Unauthorized" };
         }
 
+        // Reconcile subscription status first (self-healing)
+        await PaymentService.reconcileSubscription(session.userId);
+
         const user = await prisma.user.findUnique({
             where: { id: session.userId },
             select: {
@@ -568,6 +571,9 @@ export async function pollBillingStatusAction(): Promise<{
             return { success: false, error: "Unauthorized" };
         }
 
+        // Reconcile subscription status first (self-healing)
+        await PaymentService.reconcileSubscription(session.userId);
+
         // Force fresh data by using a transaction (bypasses any query cache)
         const user = await prisma.$transaction(async (tx) => {
             return tx.user.findUnique({
@@ -597,12 +603,12 @@ export async function pollBillingStatusAction(): Promise<{
         const hasActiveSubscription = !!activeSubscription && new Date() <= new Date(activeSubscription.currentPeriodEnd);
         
         // isPro can be determined by:
-        // 1. User has planType = 'PRO' (set by webhook)
+        // 1. User has planType = 'PRO' and not expired
         // 2. OR user has an active subscription with valid period
-        // 3. OR subscriptionStatus is 'ACTIVE'
-        const isPro = user.planType === 'PRO' || 
+        // 3. OR subscriptionStatus is 'ACTIVE' and not expired
+        const isPro = (user.planType === 'PRO' && (!user.currentPeriodEnd || new Date() <= new Date(user.currentPeriodEnd))) || 
                       hasActiveSubscription || 
-                      user.subscriptionStatus === 'ACTIVE';
+                      (user.subscriptionStatus === 'ACTIVE' && (!user.currentPeriodEnd || new Date() <= new Date(user.currentPeriodEnd)));
 
         console.log(`📊 Poll result for user ${session.userId}:`, {
             planType: user.planType,
