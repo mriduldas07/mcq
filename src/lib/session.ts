@@ -10,6 +10,7 @@ export type SessionUser = {
     planType: string;
     freeExamsUsed: number;
     oneTimeExamsRemaining: number;
+    role: string;
 };
 
 // Special result type for session validation with DB check
@@ -38,6 +39,7 @@ export async function verifySession(): Promise<SessionUser | null> {
         planType: session.user.planType,
         freeExamsUsed: session.user.freeExamsUsed || 0,
         oneTimeExamsRemaining: session.user.oneTimeExamsRemaining || 0,
+        role: session.user.role || "TEACHER",
     };
 }
 

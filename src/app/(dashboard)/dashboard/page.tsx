@@ -39,6 +39,11 @@ export default async function DashboardPage() {
     const session = await verifySession();
     if (!session) return redirect("/login");
 
+    // Redirect students to student dashboard
+    if (session.role === "STUDENT") {
+        return redirect("/dashboard/student");
+    }
+
     // Fetch real statistics
     const [
         totalExams,

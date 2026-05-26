@@ -1,5 +1,5 @@
 import katex from 'katex';
-import DOMPurify from 'isomorphic-dompurify';
+import DOMPurify from 'dompurify';
 
 /**
  * Renders math formulas in HTML content using KaTeX

@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { verifySession } from "@/lib/session";
 
 /**
  * TASK 1: SERVER-CONTROLLED TIMER + AUTO-SUBMIT
@@ -95,6 +96,10 @@ export async function startExamAction(examId: string, studentName: string, rollN
             // Function continues to creation below...
         }
 
+        // Check if there is an authenticated user session to link
+        const session = await verifySession();
+        const studentId = session?.userId || null;
+
         // 6. Create attempt WITHOUT starting timer (timer starts on first fullscreen entry)
         // NOTE: Using createdAt as placeholder until migration makes startedAt nullable
         const attempt = await prisma.studentAttempt.create({
@@ -102,6 +107,7 @@ export async function startExamAction(examId: string, studentName: string, rollN
                 examId,
                 studentName,
                 rollNumber,
+                studentId,
                 // startedAt: null, // TODO: Uncomment after running migration
                 startTime: null,
                 endTime: null,
@@ -385,6 +391,7 @@ export async function getAttemptStatusAction(attemptId: string) {
                 submitted: true,
                 answers: true,
                 violations: true,
+                warningMessage: true,
             },
         });
 
@@ -405,6 +412,7 @@ export async function getAttemptStatusAction(attemptId: string) {
                 submitted: attempt.submitted,
                 answers,
                 violations: attempt.violations,
+                warningMessage: attempt.warningMessage,
             },
         };
     } catch (e) {
@@ -477,3 +485,154 @@ export async function recordViolationAction(attemptId: string) {
         return { success: false, error: "Failed to record violation" };
     }
 }
+
+/**
+ * Send a real-time warning to a student's active exam screen
+ */
+export async function sendProctorWarningAction(attemptId: string, message: string) {
+    try {
+        const session = await verifySession();
+        if (!session || session.role !== "TEACHER") {
+            return { success: false, error: "Unauthorized" };
+        }
+
+        const attempt = await prisma.studentAttempt.findUnique({
+            where: { id: attemptId },
+            select: {
+                exam: {
+                    select: { teacherId: true }
+                }
+            }
+        });
+
+        if (!attempt) return { success: false, error: "Attempt not found" };
+        if (attempt.exam.teacherId !== session.userId) {
+            return { success: false, error: "Unauthorized" };
+        }
+
+        await prisma.studentAttempt.update({
+            where: { id: attemptId },
+            data: { warningMessage: message }
+        });
+
+        return { success: true };
+    } catch (e) {
+        console.error("sendProctorWarningAction error", e);
+        return { success: false, error: "Failed to send warning" };
+    }
+}
+
+/**
+ * Clear the warning message on a student's exam screen
+ */
+export async function clearProctorWarningAction(attemptId: string) {
+    try {
+        const session = await verifySession();
+        if (!session || session.role !== "TEACHER") {
+            return { success: false, error: "Unauthorized" };
+        }
+
+        const attempt = await prisma.studentAttempt.findUnique({
+            where: { id: attemptId },
+            select: {
+                exam: {
+                    select: { teacherId: true }
+                }
+            }
+        });
+
+        if (!attempt) return { success: false, error: "Attempt not found" };
+        if (attempt.exam.teacherId !== session.userId) {
+            return { success: false, error: "Unauthorized" };
+        }
+
+        await prisma.studentAttempt.update({
+            where: { id: attemptId },
+            data: { warningMessage: null }
+        });
+
+        return { success: true };
+    } catch (e) {
+        console.error("clearProctorWarningAction error", e);
+        return { success: false, error: "Failed to clear warning" };
+    }
+}
+
+/**
+ * Force disqualify a student attempt, submitting it immediately
+ */
+export async function forceDisqualifyAttemptAction(attemptId: string) {
+    try {
+        const session = await verifySession();
+        if (!session || session.role !== "TEACHER") {
+            return { success: false, error: "Unauthorized" };
+        }
+
+        const attempt = await prisma.studentAttempt.findUnique({
+            where: { id: attemptId },
+            include: {
+                exam: {
+                    include: { questions: true }
+                }
+            }
+        });
+
+        if (!attempt) return { success: false, error: "Attempt not found" };
+        if (attempt.exam.teacherId !== session.userId) {
+            return { success: false, error: "Unauthorized" };
+        }
+
+        if (attempt.submitted) {
+            return { success: false, error: "Attempt already submitted" };
+        }
+
+        // Grade the attempt immediately
+        const questions = attempt.exam.questions;
+        const answers = typeof attempt.answers === 'object' && attempt.answers !== null
+            ? (attempt.answers as Record<string, string>)
+            : {};
+
+        let score = 0;
+        let correctAnswers = 0;
+        let wrongAnswers = 0;
+        let unanswered = 0;
+        const totalQuestions = questions.length;
+
+        questions.forEach((q) => {
+            const studentAnswer = answers[q.id];
+            if (!studentAnswer) {
+                unanswered++;
+            } else if (studentAnswer === q.correctOption) {
+                correctAnswers++;
+                score += q.marks;
+            } else {
+                wrongAnswers++;
+            }
+        });
+
+        const totalMarks = questions.reduce((acc, curr) => acc + curr.marks, 0);
+        const finalPercentage = totalMarks > 0 ? Math.round((score / totalMarks) * 100) : 0;
+
+        await prisma.studentAttempt.update({
+            where: { id: attemptId },
+            data: {
+                submitted: true,
+                completedAt: new Date(),
+                score: finalPercentage,
+                totalQuestions,
+                correctAnswers,
+                wrongAnswers,
+                unanswered,
+                trustScore: 0, // Force trustScore to 0 for disqualification
+                integrityLevel: "LOW",
+                warningMessage: "DISQUALIFIED_BY_PROCTOR"
+            }
+        });
+
+        return { success: true };
+    } catch (e) {
+        console.error("forceDisqualifyAttemptAction error", e);
+        return { success: false, error: "Failed to disqualify student" };
+    }
+}
+

@@ -10,6 +10,7 @@ declare module "next-auth" {
       planType: string;
       freeExamsUsed: number;
       oneTimeExamsRemaining: number;
+      role: string;
     } & DefaultSession["user"];
   }
 
@@ -21,6 +22,7 @@ declare module "next-auth" {
     planType: string;
     freeExamsUsed: number;
     oneTimeExamsRemaining: number;
+    role: string;
   }
 }
 
@@ -33,5 +35,6 @@ declare module "next-auth/jwt" {
     planType: string;
     freeExamsUsed: number;
     oneTimeExamsRemaining: number;
+    role: string;
   }
 }

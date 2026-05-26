@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { BarChart, BookOpen, Home, Library } from "lucide-react";
 
-const items = [
+const teacherItems = [
     {
         title: "Overview",
         href: "/dashboard",
@@ -28,8 +28,22 @@ const items = [
     },
 ];
 
-export function DashboardNav({ onNavigate }: { onNavigate?: () => void }) {
+const studentItems = [
+    {
+        title: "Overview",
+        href: "/dashboard/student",
+        icon: Home,
+    },
+    {
+        title: "My Attempts",
+        href: "/dashboard/student/attempts",
+        icon: BookOpen,
+    },
+];
+
+export function DashboardNav({ onNavigate, role = "TEACHER" }: { onNavigate?: () => void; role?: string }) {
     const pathname = usePathname();
+    const items = role === "STUDENT" ? studentItems : teacherItems;
 
     return (
         <nav className="grid items-start gap-2">

@@ -25,6 +25,7 @@ model User {
   paddleSubscriptionId  String?  @unique // Current active Paddle subscription ID
   subscriptionStatus    SubscriptionStatusType @default(NONE) // Quick access to subscription status
   currentPeriodEnd      DateTime? // When current subscription period ends
+  role                  UserRole @default(TEACHER)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
@@ -34,6 +35,7 @@ model User {
   questionBank  QuestionBank[]
   folders       QuestionFolder[]
   subscriptions Subscription[]
+  studentAttempts StudentAttempt[]
 
   @@index([provider, providerAccountId])
   @@index([paddleCustomerId])
@@ -43,6 +45,11 @@ model User {
 enum PlanType {
   FREE
   PRO
+}
+
+enum UserRole {
+  TEACHER
+  STUDENT
 }
 
 // User-level subscription status for quick access
@@ -131,6 +138,8 @@ model StudentAttempt {
   exam           Exam      @relation(fields: [examId], references: [id], onDelete: Cascade)
   studentName    String
   rollNumber     String?
+  studentId      String?
+  student        User?     @relation(fields: [studentId], references: [id], onDelete: Cascade)
   startTime      DateTime? // When exam actually started (server time) - set on first fullscreen entry
   endTime        DateTime? // Calculated deadline (server time) - set on first fullscreen entry
   startedAt      DateTime? // CRITICAL: Set only when student enters fullscreen for first time (NULL = exam not started)
@@ -150,6 +159,7 @@ model StudentAttempt {
   totalAwayTime   Int    @default(0) // Total seconds away from exam
   questionTimings Json? // { questionId: timeSpentSeconds }
   answerRevisions Json? // { questionId: revisionCount }
+  warningMessage  String?
 
   createdAt       DateTime         @default(now())
   integrityEvents IntegrityEvent[]

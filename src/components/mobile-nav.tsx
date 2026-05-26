@@ -6,7 +6,7 @@ import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/s
 import { DashboardNav } from "@/components/dashboard-nav";
 import { Button } from "@/components/ui/button";
 
-export function MobileNav() {
+export function MobileNav({ role = "TEACHER" }: { role?: string }) {
     const [open, setOpen] = useState(false);
     const [mounted, setMounted] = useState(false);
 
@@ -45,7 +45,7 @@ export function MobileNav() {
             <SheetContent side="left" className="w-[240px] sm:w-[280px]">
                 <SheetTitle className="text-lg font-semibold mb-6">Navigation</SheetTitle>
                 <div>
-                    <DashboardNav onNavigate={() => setOpen(false)} />
+                    <DashboardNav role={role} onNavigate={() => setOpen(false)} />
                 </div>
             </SheetContent>
         </Sheet>

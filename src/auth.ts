@@ -63,6 +63,7 @@ export const authConfig = {
               oneTimeExamsRemaining: true,
               provider: true,
               providerAccountId: true,
+              role: true,
             },
           });
 
@@ -89,6 +90,7 @@ export const authConfig = {
                 oneTimeExamsRemaining: true,
                 provider: true,
                 providerAccountId: true,
+                role: true,
               },
             });
           } else {
@@ -109,6 +111,7 @@ export const authConfig = {
                 oneTimeExamsRemaining: true,
                 provider: true,
                 providerAccountId: true,
+                role: true,
               },
             });
           }
@@ -121,6 +124,7 @@ export const authConfig = {
           token.planType = dbUser.planType;
           token.freeExamsUsed = dbUser.freeExamsUsed;
           token.oneTimeExamsRemaining = dbUser.oneTimeExamsRemaining;
+          token.role = dbUser.role;
         } catch (error) {
           console.error("JWT callback error - database issue:", error);
           // Return token as-is to prevent complete auth failure
@@ -147,6 +151,7 @@ export const authConfig = {
         session.user.planType = token.planType as string;
         session.user.freeExamsUsed = token.freeExamsUsed as number;
         session.user.oneTimeExamsRemaining = token.oneTimeExamsRemaining as number;
+        session.user.role = token.role as string;
       }
 
       return session;

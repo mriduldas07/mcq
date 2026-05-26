@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import DOMPurify from 'isomorphic-dompurify';
+import { sanitizeHtml } from "@/lib/sanitize";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -70,6 +70,7 @@ export function ExamSession({
     const [endTime, setEndTime] = useState<string | null>(initialEndTime);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [violations, setViolations] = useState(0);
+    const [proctorWarning, setProctorWarning] = useState<string | null>(null);
     
     // Refs to prevent duplicate actions
     const hasAutoSubmitted = useRef(false);
@@ -418,6 +419,51 @@ export function ExamSession({
     }, [answers, attemptId, isSubmitting, isOnline, examState]);
 
     // =================================================================
+    // PROCTOR MONITORING: Poll for warnings or disqualification
+    // =================================================================
+    useEffect(() => {
+        if (examState !== ExamState.RUNNING) return;
+
+        const checkProctorActions = async () => {
+            try {
+                const result = await getAttemptStatusAction(attemptId);
+                if (result.success && result.attempt) {
+                    // 1. Check if disqualified or force-submitted by proctor
+                    if (result.attempt.submitted) {
+                        console.log("🛑 DISQUALIFIED or SUBMITTED by proctor");
+                        // Clear local storage
+                        const storageKey = `exam_${attemptId}_answers`;
+                        localStorage.removeItem(storageKey);
+                        
+                        // Force fullscreen exit
+                        try {
+                            if (document.exitFullscreen) {
+                                await document.exitFullscreen();
+                            }
+                        } catch (e) {}
+
+                        router.replace(`/exam/${examId}/result?attemptId=${attemptId}`);
+                        return;
+                    }
+
+                    // 2. Check for proctor warning message
+                    if (result.attempt.warningMessage) {
+                        setProctorWarning(result.attempt.warningMessage);
+                    } else {
+                        setProctorWarning(null);
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to check proctor status", e);
+            }
+        };
+
+        // Poll every 3 seconds
+        const poll = setInterval(checkProctorActions, 3000);
+        return () => clearInterval(poll);
+    }, [examState, attemptId, examId, router]);
+
+    // =================================================================
     // HANDLERS
     // =================================================================
     const handleOptionSelect = (questionId: string, optionId: string) => {
@@ -564,6 +610,12 @@ export function ExamSession({
     // =================================================================
     return (
         <div className="flex flex-col min-h-screen bg-muted/20">
+            {proctorWarning && (
+                <div className="bg-destructive text-destructive-foreground text-xs sm:text-sm px-4 py-2.5 sm:py-3 text-center animate-pulse font-bold flex items-center justify-center gap-2 border-b-2 border-white/20">
+                    <AlertCircle className="h-4 w-4 shrink-0 animate-bounce" />
+                    <span>⚠️ PROCTOR ALERT: {proctorWarning}</span>
+                </div>
+            )}
             {/* Header */}
             <header className="sticky top-0 z-10 bg-background border-b shadow-sm p-3 sm:p-4">
                 <div className="container mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4">
@@ -627,7 +679,7 @@ export function ExamSession({
                             <CardTitle 
                                 ref={questionRef}
                                 className="text-sm sm:text-base md:text-[17px] lg:text-[19px] font-medium leading-[1.65]"
-                                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(currentQuestion.text) }}
+                                dangerouslySetInnerHTML={{ __html: sanitizeHtml(currentQuestion.text) }}
                             />
                         </CardHeader>
                         <CardContent className="flex-1 pt-2 px-4 sm:px-6" ref={optionsRef}>
@@ -652,7 +704,7 @@ export function ExamSession({
                                         <Label 
                                             htmlFor={opt.id} 
                                             className="flex-1 cursor-pointer font-normal text-sm sm:text-[15px] md:text-base leading-[1.6]"
-                                            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(opt.text) }}
+                                            dangerouslySetInnerHTML={{ __html: sanitizeHtml(opt.text) }}
                                         />
                                     </div>
                                 ))}

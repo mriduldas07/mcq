@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Shield } from "lucide-react";
 import { CopyLinkButton } from "@/components/copy-link-button";
 import { PublishButton } from "@/components/publish-button";
 import { DeleteExamButton } from "@/components/delete-exam-button";
@@ -117,6 +117,13 @@ export default async function ExamEditorPage({
                 {/* Right: Actions */}
                 <div className="flex flex-wrap items-center gap-2">
                     {exam.status === 'PUBLISHED' && <CopyLinkButton examId={examId} />}
+                    {exam.status === 'PUBLISHED' && (
+                        <Link href={`/dashboard/exams/${examId}/proctor`}>
+                            <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 font-semibold gap-1.5 shadow-sm text-xs">
+                                <Shield className="h-4 w-4" /> Live Proctor
+                            </Button>
+                        </Link>
+                    )}
                     <Badge variant={exam.status === 'PUBLISHED' ? 'default' : 'secondary'} className="uppercase text-xs">
                         {exam.status}
                     </Badge>
