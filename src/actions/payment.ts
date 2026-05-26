@@ -91,7 +91,7 @@ export async function purchaseOneTimeExamAction(): Promise<PaymentResult> {
             
             if (!customerResult.success || !customerResult.customerId) {
                 console.error('Failed to create Paddle customer:', customerResult.error);
-                return { error: "Unable to set up payment. Please try again." };
+                return { error: customerResult.error || "Unable to set up payment. Please try again." };
             }
             
             // Attempt to save atomically only if not set (handles concurrency)
@@ -241,7 +241,7 @@ export async function createProSubscriptionAction(
             
             if (!customerResult.success || !customerResult.customerId) {
                 console.error('Failed to create Paddle customer:', customerResult.error);
-                return { error: "Unable to set up payment. Please try again." };
+                return { error: customerResult.error || "Unable to set up payment. Please try again." };
             }
             
             // Attempt to save atomically only if not set (handles concurrency)
