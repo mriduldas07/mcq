@@ -115,7 +115,7 @@ export async function purchaseOneTimeExamAction(): Promise<PaymentResult> {
         // 5. Create checkout session
         const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
         
-        const checkoutResult = await createPaddleCheckout({
+        let checkoutResult = await createPaddleCheckout({
             customerId: paddleCustomerId,
             priceId: PADDLE_PRICE_IDS.ONE_TIME_EXAM,
             quantity: 1,
@@ -127,6 +127,41 @@ export async function purchaseOneTimeExamAction(): Promise<PaymentResult> {
             },
             successUrl: `${baseUrl}/dashboard/billing?success=true&type=exam`,
         });
+
+        // SELF-HEALING RETRY: If error is permission-related (e.g., customer ID from a different environment/account), recreate the customer
+        if (!checkoutResult.success && checkoutResult.error?.toLowerCase().includes("permit")) {
+            console.warn(`⚠️ Customer ID ${paddleCustomerId} was rejected with permission error. Recreating customer...`);
+            
+            // Clear customer ID in DB
+            await prisma.user.update({
+                where: { id: user.id },
+                data: { paddleCustomerId: null }
+            });
+
+            // Create new customer
+            const customerResult = await getOrCreatePaddleCustomer(user.email, user.name || undefined);
+            if (customerResult.success && customerResult.customerId) {
+                // Update DB with new customer ID
+                await prisma.user.update({
+                    where: { id: user.id },
+                    data: { paddleCustomerId: customerResult.customerId }
+                });
+
+                // Retry checkout creation
+                checkoutResult = await createPaddleCheckout({
+                    customerId: customerResult.customerId,
+                    priceId: PADDLE_PRICE_IDS.ONE_TIME_EXAM,
+                    quantity: 1,
+                    customData: {
+                        userId: user.id,
+                        userEmail: user.email,
+                        purchaseType: 'ONE_TIME_EXAM',
+                        timestamp: new Date().toISOString(),
+                    },
+                    successUrl: `${baseUrl}/dashboard/billing?success=true&type=exam`,
+                });
+            }
+        }
 
         if (!checkoutResult.success || !checkoutResult.checkoutUrl) {
             console.error('Failed to create checkout:', checkoutResult.error);
@@ -234,7 +269,7 @@ export async function createProSubscriptionAction(
             
         const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
         
-        const checkoutResult = await createPaddleCheckout({
+        let checkoutResult = await createPaddleCheckout({
             customerId: paddleCustomerId,
             priceId,
             quantity: 1,
@@ -247,6 +282,42 @@ export async function createProSubscriptionAction(
             },
             successUrl: `${baseUrl}/dashboard/billing?success=true&type=subscription&plan=${plan.toLowerCase()}`,
         });
+
+        // SELF-HEALING RETRY: If error is permission-related (e.g., customer ID from a different environment/account), recreate the customer
+        if (!checkoutResult.success && checkoutResult.error?.toLowerCase().includes("permit")) {
+            console.warn(`⚠️ Customer ID ${paddleCustomerId} was rejected with permission error. Recreating customer...`);
+            
+            // Clear customer ID in DB
+            await prisma.user.update({
+                where: { id: user.id },
+                data: { paddleCustomerId: null }
+            });
+
+            // Create new customer
+            const customerResult = await getOrCreatePaddleCustomer(user.email, user.name || undefined);
+            if (customerResult.success && customerResult.customerId) {
+                // Update DB with new customer ID
+                await prisma.user.update({
+                    where: { id: user.id },
+                    data: { paddleCustomerId: customerResult.customerId }
+                });
+
+                // Retry checkout creation
+                checkoutResult = await createPaddleCheckout({
+                    customerId: customerResult.customerId,
+                    priceId,
+                    quantity: 1,
+                    customData: {
+                        userId: user.id,
+                        userEmail: user.email,
+                        purchaseType: 'PRO_SUBSCRIPTION',
+                        plan,
+                        timestamp: new Date().toISOString(),
+                    },
+                    successUrl: `${baseUrl}/dashboard/billing?success=true&type=subscription&plan=${plan.toLowerCase()}`,
+                });
+            }
+        }
 
         if (!checkoutResult.success || !checkoutResult.checkoutUrl) {
             console.error('Failed to create checkout:', checkoutResult.error);
