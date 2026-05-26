@@ -4,7 +4,7 @@ import { useState, useTransition, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Check, Sparkles, Loader2, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
-import { purchaseOneTimeExamAction, createProSubscriptionAction, cancelSubscriptionAction } from "@/actions/payment";
+import { purchaseOneTimeExamAction, createProSubscriptionAction, cancelSubscriptionAction, pollBillingStatusAction } from "@/actions/payment";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
@@ -353,6 +353,52 @@ export function BillingClient({
             router.replace('/dashboard/billing?success=true&type=' + (purchaseType || 'payment'), { scroll: false });
         }
     }, [paymentProcessed, purchaseType, router]);
+
+    // Active polling for payment completion (highly responsive, no manual refresh needed)
+    useEffect(() => {
+        if (!isProcessing) return;
+
+        let active = true;
+        let attempt = 0;
+        const maxAttempts = 15; // Poll for max 30 seconds
+
+        const poll = async () => {
+            if (!active) return;
+            try {
+                const result = await pollBillingStatusAction();
+                if (result.success && result.data) {
+                    const status = result.data;
+                    
+                    // Check if payment was processed successfully based on type
+                    const isSuccessSub = purchaseType === 'subscription' && status.isPro;
+                    const isSuccessExam = purchaseType === 'exam' && status.oneTimeExamsRemaining > oneTimeExamsRemaining;
+
+                    if (isSuccessSub || isSuccessExam) {
+                        console.log("✅ Payment processed detected in client polling!");
+                        // Hard reload to refresh NextAuth session cookie and show active Pro plan
+                        window.location.href = `/dashboard/billing?success=true&type=${purchaseType || 'payment'}`;
+                        return;
+                    }
+                }
+            } catch (err) {
+                console.error("Billing poll error:", err);
+            }
+
+            attempt++;
+            if (attempt < maxAttempts && active) {
+                // Poll every 2 seconds
+                setTimeout(poll, 2000);
+            }
+        };
+
+        // Start polling after 1.5 seconds delay
+        const initialTimer = setTimeout(poll, 1500);
+
+        return () => {
+            active = false;
+            clearTimeout(initialTimer);
+        };
+    }, [isProcessing, purchaseType, oneTimeExamsRemaining]);
 
     // FRONTEND GUARD: Check if user can subscribe
     // User should NOT be able to subscribe if they already have an active subscription
