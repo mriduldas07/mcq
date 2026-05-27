@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
+import { FormattedDate } from "@/components/formatted-date";
 
 /**
  * TASK 2: Proper Student Attempt Flow
@@ -134,14 +135,14 @@ export default async function ExamLandingPage({
                     {isBeforeStart && (
                         <div className="rounded-md bg-orange-50 p-4 text-sm text-orange-800 border border-orange-200 mb-6">
                             <strong>⏰ Exam Not Yet Available</strong>
-                            <p className="mt-2">This exam will be available from: <strong>{new Date(exam.scheduledStartTime!).toLocaleString()}</strong></p>
+                            <p className="mt-2">This exam will be available from: <strong><FormattedDate date={exam.scheduledStartTime!} /></strong></p>
                         </div>
                     )}
 
                     {isAfterEnd && !exam.allowLateSubmission && (
                         <div className="rounded-md bg-red-50 p-4 text-sm text-red-800 border border-red-200 mb-6">
                             <strong>⏱️ Exam Time Expired</strong>
-                            <p className="mt-2">This exam closed on: <strong>{new Date(exam.scheduledEndTime!).toLocaleString()}</strong></p>
+                            <p className="mt-2">This exam closed on: <strong><FormattedDate date={exam.scheduledEndTime!} /></strong></p>
                         </div>
                     )}
 

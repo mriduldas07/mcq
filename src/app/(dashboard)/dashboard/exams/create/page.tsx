@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,11 @@ export default function CreateExamPage() {
     const [formData, setFormData] = useState<any>(null);
     const [currentStep, setCurrentStep] = useState(0);
     const [completedSteps, setCompletedSteps] = useState<number[]>([]);
+    const [timezoneOffset, setTimezoneOffset] = useState<string>("");
+
+    useEffect(() => {
+        setTimezoneOffset(String(new Date().getTimezoneOffset()));
+    }, []);
 
     const handleFormSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -166,6 +171,7 @@ export default function CreateExamPage() {
             </div>
             
             <form id="createExamForm" onSubmit={handleFormSubmit} className="space-y-4 sm:space-y-5 md:space-y-6">
+                <input type="hidden" name="clientTimezoneOffset" value={timezoneOffset} />
                 {/* Step 0: Basic Information */}
                 <div style={{ display: currentStep === 0 ? 'block' : 'none' }} className="space-y-3 sm:space-y-4 md:space-y-6">
                     <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">

@@ -6,6 +6,19 @@ import { revalidatePath } from "next/cache";
 import { PaymentService } from "@/lib/payment-service";
 import { verifySession } from "@/lib/session";
 
+function parseLocalDateTime(localStr: string | null, offsetMinutes: number | null): Date | null {
+    if (!localStr || localStr.trim() === "") return null;
+    
+    const utcDate = new Date(localStr + "Z");
+    if (isNaN(utcDate.getTime())) return null;
+    
+    if (offsetMinutes !== null) {
+        utcDate.setMinutes(utcDate.getMinutes() + offsetMinutes);
+    }
+    
+    return utcDate;
+}
+
 export async function createExamAction(formData: FormData) {
     const session = await verifySession();
     if (!session) {
@@ -61,15 +74,16 @@ export async function createExamAction(formData: FormData) {
     }
     
     // Scheduling settings
-    const scheduledStartTimeStr = formData.get("scheduledStartTime") as string | null;
-    const scheduledStartTime = scheduledStartTimeStr && scheduledStartTimeStr.trim() !== "" 
-        ? new Date(scheduledStartTimeStr) 
+    const clientTimezoneOffsetStr = formData.get("clientTimezoneOffset") as string | null;
+    const clientTimezoneOffset = clientTimezoneOffsetStr && clientTimezoneOffsetStr.trim() !== ""
+        ? parseInt(clientTimezoneOffsetStr)
         : null;
+
+    const scheduledStartTimeStr = formData.get("scheduledStartTime") as string | null;
+    const scheduledStartTime = parseLocalDateTime(scheduledStartTimeStr, clientTimezoneOffset);
     
     const scheduledEndTimeStr = formData.get("scheduledEndTime") as string | null;
-    const scheduledEndTime = scheduledEndTimeStr && scheduledEndTimeStr.trim() !== "" 
-        ? new Date(scheduledEndTimeStr) 
-        : null;
+    const scheduledEndTime = parseLocalDateTime(scheduledEndTimeStr, clientTimezoneOffset);
     
     const allowLateSubmission = formData.get("allowLateSubmission") === "true";
     
@@ -439,8 +453,17 @@ export async function updateExamAction(examId: string, formData: FormData) {
         const maxAttempts = formData.get("maxAttempts") ? parseInt(formData.get("maxAttempts") as string) : null;
         
         // Scheduling settings
-        const scheduledStartTime = formData.get("scheduledStartTime") ? new Date(formData.get("scheduledStartTime") as string) : null;
-        const scheduledEndTime = formData.get("scheduledEndTime") ? new Date(formData.get("scheduledEndTime") as string) : null;
+        const clientTimezoneOffsetStr = formData.get("clientTimezoneOffset") as string | null;
+        const clientTimezoneOffset = clientTimezoneOffsetStr && clientTimezoneOffsetStr.trim() !== ""
+            ? parseInt(clientTimezoneOffsetStr)
+            : null;
+
+        const scheduledStartTimeStr = formData.get("scheduledStartTime") as string | null;
+        const scheduledStartTime = parseLocalDateTime(scheduledStartTimeStr, clientTimezoneOffset);
+        
+        const scheduledEndTimeStr = formData.get("scheduledEndTime") as string | null;
+        const scheduledEndTime = parseLocalDateTime(scheduledEndTimeStr, clientTimezoneOffset);
+        
         const allowLateSubmission = formData.get("allowLateSubmission") === "true";
         
         // Negative marking settings

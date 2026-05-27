@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { updateExamAction } from "@/actions/exam";
 import { Edit2, Save, X, Loader2, Shield, Target, Shuffle, Lock, Calendar } from "lucide-react";
+import { FormattedDate } from "./formatted-date";
 
 interface EditExamFormProps {
     examId: string;
@@ -51,6 +52,11 @@ export function EditExamForm({
     const [isEditing, setIsEditing] = useState(false);
     const [isPending, startTransition] = useTransition();
     const [showAdvanced, setShowAdvanced] = useState(false);
+    const [timezoneOffset, setTimezoneOffset] = useState<string>("");
+
+    useEffect(() => {
+        setTimezoneOffset(String(new Date().getTimezoneOffset()));
+    }, []);
 
     if (status === "PUBLISHED") {
         return (
@@ -215,13 +221,13 @@ export function EditExamForm({
                                     {scheduledStartTime && (
                                         <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-2">
                                             <span className="text-muted-foreground text-xs sm:text-sm">Start Time:</span>
-                                            <span className="font-medium text-sm break-words">{new Date(scheduledStartTime).toLocaleString()}</span>
+                                            <span className="font-medium text-sm break-words"><FormattedDate date={scheduledStartTime} /></span>
                                         </div>
                                     )}
                                     {scheduledEndTime && (
                                         <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-2">
                                             <span className="text-muted-foreground text-xs sm:text-sm">End Time:</span>
-                                            <span className="font-medium text-sm break-words">{new Date(scheduledEndTime).toLocaleString()}</span>
+                                            <span className="font-medium text-sm break-words"><FormattedDate date={scheduledEndTime} /></span>
                                         </div>
                                     )}
                                 </>
@@ -248,7 +254,13 @@ export function EditExamForm({
     const formatDateTimeLocal = (date: Date | null) => {
         if (!date) return "";
         const d = new Date(date);
-        return d.toISOString().slice(0, 16);
+        const pad = (num: number) => String(num).padStart(2, '0');
+        const year = d.getFullYear();
+        const month = pad(d.getMonth() + 1);
+        const day = pad(d.getDate());
+        const hours = pad(d.getHours());
+        const minutes = pad(d.getMinutes());
+        return `${year}-${month}-${day}T${hours}:${minutes}`;
     };
 
     return (
@@ -260,6 +272,7 @@ export function EditExamForm({
                 </CardHeader>
                 <CardContent className="px-3 sm:px-6">
                     <form action={handleSubmit} className="space-y-6">
+                        <input type="hidden" name="clientTimezoneOffset" value={timezoneOffset} />
                         {/* Basic Information */}
                         <div className="space-y-4">
                             <h4 className="font-semibold text-sm flex items-center gap-2">
