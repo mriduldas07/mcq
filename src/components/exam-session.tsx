@@ -311,6 +311,8 @@ export function ExamSession({
                 } catch (e) {
                     console.error("Failed to record violation", e);
                 }
+            } else {
+                toast.error("Tab switch detected! This action has been logged as a violation.");
             }
         };
 
@@ -326,6 +328,7 @@ export function ExamSession({
         
         const handleBlur = async () => {
             console.log(`⚠️ Focus lost (Alt+Tab or click outside)`);
+            toast.error("Warning: Window focus lost! Clicking outside the exam or switching apps is recorded as a violation.");
             try {
                 const result = await recordViolationAction(attemptId, "FOCUS_LOST");
                 if (result.success && result.violations !== undefined) {
@@ -676,6 +679,14 @@ export function ExamSession({
     const isLastQuestion = currentQuestionIndex === questions.length - 1;
     const progress = ((Object.keys(answers).length) / questions.length) * 100;
 
+    // Dynamic repeating tiled security watermark
+    const watermarkSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200" viewBox="0 0 300 200">
+        <text x="150" y="100" fill="rgba(128,128,128,0.08)" font-family="sans-serif" font-size="11" font-weight="600" transform="rotate(-20 150 100)" text-anchor="middle">
+            ${studentName} - Roll: ${rollNumber}
+        </text>
+    </svg>`;
+    const watermarkUrl = `url("data:image/svg+xml;utf8,${encodeURIComponent(watermarkSvg)}")`;
+
     // =================================================================
     // RENDER: WAITING STATE
     // =================================================================
@@ -733,7 +744,13 @@ export function ExamSession({
     // RENDER: RUNNING/ENDED STATE
     // =================================================================
     return (
-        <div className="flex flex-col min-h-screen bg-muted/20">
+        <div className="flex flex-col min-h-screen bg-muted/20 select-none relative">
+            {antiCheatEnabled && (
+                <div 
+                    className="fixed inset-0 pointer-events-none z-40 select-none bg-repeat"
+                    style={{ backgroundImage: watermarkUrl }}
+                />
+            )}
             {proctorWarning && (
                 <div className="bg-destructive text-destructive-foreground text-xs sm:text-sm px-4 py-2.5 sm:py-3 text-center animate-pulse font-bold flex items-center justify-center gap-2 border-b-2 border-white/20">
                     <AlertCircle className="h-4 w-4 shrink-0 animate-bounce" />
