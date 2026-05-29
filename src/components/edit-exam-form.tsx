@@ -28,6 +28,8 @@ interface EditExamFormProps {
     scheduledStartTime?: Date | null;
     scheduledEndTime?: Date | null;
     allowLateSubmission?: boolean;
+    accessMode?: string;
+    whitelistEmails?: string[];
 }
 
 export function EditExamForm({ 
@@ -48,11 +50,14 @@ export function EditExamForm({
     scheduledStartTime = null,
     scheduledEndTime = null,
     allowLateSubmission = false,
+    accessMode = "PUBLIC",
+    whitelistEmails = [],
 }: EditExamFormProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [isPending, startTransition] = useTransition();
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [timezoneOffset, setTimezoneOffset] = useState<string>("");
+    const [showWhitelist, setShowWhitelist] = useState(accessMode === "RESTRICTED");
 
     useEffect(() => {
         setTimezoneOffset(String(new Date().getTimezoneOffset()));
@@ -212,10 +217,22 @@ export function EditExamForm({
                             Access Control
                         </h4>
                         <div className="grid gap-2 text-sm pl-0 sm:pl-6">
-                            <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-2">
+                             <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-2">
                                 <span className="text-muted-foreground text-xs sm:text-sm">Max Attempts:</span>
                                 <span className="font-medium text-sm">{maxAttempts || "Unlimited"}</span>
                             </div>
+                            <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-2">
+                                <span className="text-muted-foreground text-xs sm:text-sm">Access Mode:</span>
+                                <span className="font-medium text-sm capitalize">{accessMode.toLowerCase()}</span>
+                            </div>
+                            {accessMode === "RESTRICTED" && whitelistEmails.length > 0 && (
+                                <div className="flex flex-col gap-1 mt-1">
+                                    <span className="text-muted-foreground text-xs sm:text-sm">Whitelisted Students ({whitelistEmails.length}):</span>
+                                    <div className="max-h-20 overflow-y-auto border rounded p-1.5 text-xs text-muted-foreground bg-muted/20 font-mono break-all leading-normal">
+                                        {whitelistEmails.join(", ")}
+                                    </div>
+                                </div>
+                            )}
                             {(scheduledStartTime || scheduledEndTime) && (
                                 <>
                                     {scheduledStartTime && (
@@ -449,6 +466,34 @@ export function EditExamForm({
                                             placeholder="Leave empty for unlimited"
                                         />
                                     </div>
+                                    <div className="space-y-2 pt-2 border-t mt-2">
+                                        <Label htmlFor="accessMode">Access Mode</Label>
+                                        <select 
+                                            id="accessMode" 
+                                            name="accessMode" 
+                                            defaultValue={accessMode}
+                                            className="w-full rounded-md border border-input bg-background px-3 h-10 text-sm focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
+                                            onChange={(e) => setShowWhitelist(e.target.value === "RESTRICTED")}
+                                        >
+                                            <option value="PUBLIC">Public (Anyone with link can join)</option>
+                                            <option value="RESTRICTED">Restricted (Only Whitelisted Student Emails)</option>
+                                        </select>
+                                    </div>
+                                    
+                                    {showWhitelist && (
+                                        <div className="space-y-2 transition-all duration-200">
+                                            <Label htmlFor="whitelistInput">Whitelisted Student Emails</Label>
+                                            <textarea 
+                                                id="whitelistInput" 
+                                                name="whitelistInput" 
+                                                defaultValue={whitelistEmails.join(", ")}
+                                                placeholder="student1@email.com, student2@email.com (separated by commas or newlines)" 
+                                                rows={4}
+                                                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
+                                            />
+                                            <p className="text-xs text-muted-foreground">Only students logged into accounts matching these emails can start this exam</p>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Scheduling */}

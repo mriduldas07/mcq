@@ -89,9 +89,11 @@ model Exam {
   negativeMarks          Float   @default(0) // Marks to deduct per wrong answer (e.g., 0.25)
 
   // Access control
-  requirePassword Boolean @default(false) // Require password to access
+  requirePassword Boolean    @default(false) // Require password to access
   examPassword    String? // Exam access password
   maxAttempts     Int? // Max attempts per student (null = unlimited)
+  accessMode      AccessMode @default(PUBLIC)
+  whitelistEmails String[]   @default([]) // Array of allowed lowercased student email addresses
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -104,6 +106,11 @@ enum ExamStatus {
   DRAFT
   PUBLISHED
   ENDED
+}
+
+enum AccessMode {
+  PUBLIC
+  RESTRICTED
 }
 
 enum ExamMode {

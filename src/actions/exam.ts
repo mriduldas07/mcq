@@ -104,6 +104,31 @@ export async function createExamAction(formData: FormData) {
         throw new Error("Negative marks must be between 0 and 5");
     }
 
+    // Access control settings
+    const accessModeRaw = formData.get("accessMode") as string | null;
+    const accessMode = accessModeRaw === "RESTRICTED" ? "RESTRICTED" : "PUBLIC";
+    let whitelistEmails: string[] = [];
+
+    if (accessMode === "RESTRICTED") {
+        const whitelistInput = formData.get("whitelistInput") as string | null;
+        if (whitelistInput && whitelistInput.trim() !== "") {
+            whitelistEmails = whitelistInput
+                .split(/[\n,;]+/)
+                .map(email => email.trim().toLowerCase())
+                .filter(email => {
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    return emailRegex.test(email);
+                });
+            
+            // Deduplicate the array
+            whitelistEmails = Array.from(new Set(whitelistEmails));
+        }
+
+        if (whitelistEmails.length === 0) {
+            throw new Error("You must whitelist at least one valid student email in Restricted Mode");
+        }
+    }
+
     let examId = "";
 
     try {
@@ -163,6 +188,8 @@ export async function createExamAction(formData: FormData) {
                 allowLateSubmission,
                 negativeMarking,
                 negativeMarks,
+                accessMode: accessMode as "PUBLIC" | "RESTRICTED",
+                whitelistEmails,
             },
         });
         examId = exam.id;
@@ -470,6 +497,31 @@ export async function updateExamAction(examId: string, formData: FormData) {
         const negativeMarking = formData.get("negativeMarking") === "true";
         const negativeMarks = formData.get("negativeMarks") ? parseFloat(formData.get("negativeMarks") as string) : 0;
 
+        // Access control settings
+        const accessModeRaw = formData.get("accessMode") as string | null;
+        const accessMode = accessModeRaw === "RESTRICTED" ? "RESTRICTED" : "PUBLIC";
+        let whitelistEmails: string[] = [];
+
+        if (accessMode === "RESTRICTED") {
+            const whitelistInput = formData.get("whitelistInput") as string | null;
+            if (whitelistInput && whitelistInput.trim() !== "") {
+                whitelistEmails = whitelistInput
+                    .split(/[\n,;]+/)
+                    .map(email => email.trim().toLowerCase())
+                    .filter(email => {
+                        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                        return emailRegex.test(email);
+                    });
+                
+                // Deduplicate the array
+                whitelistEmails = Array.from(new Set(whitelistEmails));
+            }
+
+            if (whitelistEmails.length === 0) {
+                throw new Error("You must whitelist at least one valid student email in Restricted Mode");
+            }
+        }
+
         await prisma.exam.update({
             where: { id: examId },
             data: {
@@ -490,6 +542,8 @@ export async function updateExamAction(examId: string, formData: FormData) {
                 allowLateSubmission,
                 negativeMarking,
                 negativeMarks,
+                accessMode: accessMode as "PUBLIC" | "RESTRICTED",
+                whitelistEmails,
             }
         });
 

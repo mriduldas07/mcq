@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { FormattedDate } from "@/components/formatted-date";
+import { verifySession } from "@/lib/session";
 
 /**
  * TASK 2: Proper Student Attempt Flow
@@ -59,6 +60,8 @@ export default async function ExamLandingPage({
             scheduledStartTime: null,
             scheduledEndTime: null,
             allowLateSubmission: false,
+            accessMode: "PUBLIC",
+            whitelistEmails: [] as string[],
         };
     } else {
         try {
@@ -81,6 +84,17 @@ export default async function ExamLandingPage({
     }
 
     if (!exam) return notFound();
+
+    const session = await verifySession();
+
+    // Check closed whitelist access
+    const isRestricted = exam.accessMode === "RESTRICTED";
+    if (isRestricted) {
+        if (!session || session.role !== "STUDENT") {
+            redirect(`/login?callbackUrl=/exam/${examId}`);
+        }
+    }
+    const isWhitelisted = isRestricted && session ? exam.whitelistEmails.includes(session.email.toLowerCase().trim()) : true;
 
     // Check if exam is published
     const isPublished = exam.status === "PUBLISHED";
@@ -146,8 +160,31 @@ export default async function ExamLandingPage({
                         </div>
                     )}
 
-                    {canAccess && (
+                    {canAccess && !isWhitelisted && (
+                        <div className="rounded-md bg-red-50 p-5 text-center border border-red-200 mb-6">
+                            <span className="text-4xl">🔒</span>
+                            <h3 className="font-bold text-lg text-red-800 mt-3 font-semibold">Access Denied</h3>
+                            <p className="mt-2 text-sm text-red-700 leading-relaxed">
+                                Your student account (<strong>{session?.email}</strong>) is not authorized to take this exam.
+                                Please contact your instructor if you believe this is an error.
+                            </p>
+                            <a href="/api/auth/signout" className="mt-4 inline-block">
+                                <Button variant="outline" size="sm" className="text-xs">
+                                    Switch Account / Logout
+                                </Button>
+                            </a>
+                        </div>
+                    )}
+
+                    {canAccess && isWhitelisted && (
                         <>
+                            {isRestricted && (
+                                <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-md p-4 text-xs sm:text-sm mb-4 sm:mb-6">
+                                    <strong>✓ Identity Verified</strong>
+                                    <p className="mt-1">Logged in as: <strong>{session?.email}</strong></p>
+                                </div>
+                            )}
+
                             <div className="rounded-md bg-blue-50 p-3 sm:p-4 text-xs sm:text-sm text-blue-800 border border-blue-200 mb-4 sm:mb-6">
                                 <strong>📋 Instructions:</strong>
                                 <ul className="list-disc pl-4 mt-2 space-y-1">
@@ -168,18 +205,20 @@ export default async function ExamLandingPage({
                                 <input type="hidden" name="examId" value={examId} />
                                 <div className="space-y-4 sm:space-y-5">
                                     <div className="space-y-2">
-                                        <Label htmlFor="name" className="text-sm sm:text-base">Full Name</Label>
+                                        <Label htmlFor="name" className="text-sm sm:text-base font-medium">Full Name</Label>
                                         <Input 
                                             id="name"
                                             name="name" 
                                             required 
+                                            readOnly={!!isRestricted}
+                                            defaultValue={session?.name || ""}
                                             placeholder="Enter your name"
                                             minLength={2}
-                                            className="h-11 sm:h-12 text-sm sm:text-base"
+                                            className={`h-11 sm:h-12 text-sm sm:text-base ${isRestricted ? "bg-muted cursor-not-allowed" : ""}`}
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="roll" className="text-sm sm:text-base">Roll Number / ID</Label>
+                                        <Label htmlFor="roll" className="text-sm sm:text-base font-medium">Roll Number / ID</Label>
                                         <Input 
                                             id="roll"
                                             name="roll" 
@@ -191,7 +230,7 @@ export default async function ExamLandingPage({
                                     </div>
                                     {exam.requirePassword && (
                                         <div className="space-y-2">
-                                            <Label htmlFor="password" className="text-sm sm:text-base">Exam Password 🔒</Label>
+                                            <Label htmlFor="password" className="text-sm sm:text-base font-medium">Exam Password 🔒</Label>
                                             <Input 
                                                 id="password"
                                                 name="password" 

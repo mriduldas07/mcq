@@ -27,6 +27,7 @@ export default function CreateExamPage() {
     const [currentStep, setCurrentStep] = useState(0);
     const [completedSteps, setCompletedSteps] = useState<number[]>([]);
     const [timezoneOffset, setTimezoneOffset] = useState<string>("");
+    const [showWhitelist, setShowWhitelist] = useState(false);
 
     useEffect(() => {
         setTimezoneOffset(String(new Date().getTimezoneOffset()));
@@ -493,6 +494,35 @@ export default function CreateExamPage() {
                                 <span className="text-xs sm:text-sm text-muted-foreground">attempts</span>
                             </div>
                             <p className="text-xs text-muted-foreground">Limit how many times a student can attempt this exam</p>
+                        </div>
+                        <div className="space-y-3 sm:space-y-4 pt-4 border-t">
+                            <div className="space-y-1.5 sm:space-y-2">
+                                <Label htmlFor="accessMode" className="text-xs sm:text-sm font-medium">Access Mode</Label>
+                                <select 
+                                    id="accessMode" 
+                                    name="accessMode" 
+                                    className="w-full rounded-md border border-input bg-background px-3 h-9 sm:h-10 text-sm focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
+                                    onChange={(e) => setShowWhitelist(e.target.value === "RESTRICTED")}
+                                >
+                                    <option value="PUBLIC">Public (Anyone with link can join)</option>
+                                    <option value="RESTRICTED">Restricted (Only Whitelisted Student Emails)</option>
+                                </select>
+                                <p className="text-xs text-muted-foreground">Control who is permitted to register and sit the exam</p>
+                            </div>
+                            
+                            {showWhitelist && (
+                                <div className="space-y-1.5 sm:space-y-2 transition-all duration-200">
+                                    <Label htmlFor="whitelistInput" className="text-xs sm:text-sm font-medium">Whitelisted Student Emails</Label>
+                                    <textarea 
+                                        id="whitelistInput" 
+                                        name="whitelistInput" 
+                                        placeholder="student1@email.com, student2@email.com (separated by commas or newlines)" 
+                                        rows={4}
+                                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
+                                    />
+                                    <p className="text-xs text-muted-foreground">Only students logged into accounts matching these emails can start this exam</p>
+                                </div>
+                            )}
                         </div>
                     </CardContent>
                 </Card>

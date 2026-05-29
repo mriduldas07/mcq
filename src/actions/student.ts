@@ -13,6 +13,8 @@ import { verifySession } from "@/lib/session";
  */
 export async function startExamAction(examId: string, studentName: string, rollNumber: string, password?: string) {
     try {
+        const session = await verifySession();
+
         // 1. Check if exam exists and is published
         const exam = await prisma.exam.findUnique({
             where: { id: examId },
@@ -29,6 +31,17 @@ export async function startExamAction(examId: string, studentName: string, rollN
 
         if (exam.status !== "PUBLISHED") {
             return { success: false, error: "Exam is not published" };
+        }
+
+        // Check closed whitelist access
+        if (exam.accessMode === "RESTRICTED") {
+            if (!session || session.role !== "STUDENT") {
+                return { success: false, error: "You must be logged in as a verified student to take this exam." };
+            }
+            const studentEmail = session.email.toLowerCase().trim();
+            if (!exam.whitelistEmails.includes(studentEmail)) {
+                return { success: false, error: `Unauthorized: ${studentEmail} is not whitelisted for this exam.` };
+            }
         }
 
         // 2. Check scheduled availability
@@ -97,7 +110,6 @@ export async function startExamAction(examId: string, studentName: string, rollN
         }
 
         // Check if there is an authenticated user session to link
-        const session = await verifySession();
         const studentId = session?.userId || null;
 
         // 6. Create attempt WITHOUT starting timer (timer starts on first fullscreen entry)
