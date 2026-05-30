@@ -35,8 +35,8 @@ export async function startExamAction(examId: string, studentName: string, rollN
 
         // Check closed whitelist access
         if (exam.accessMode === "RESTRICTED") {
-            if (!session || session.role !== "STUDENT") {
-                return { success: false, error: "You must be logged in as a verified student to take this exam." };
+            if (!session) {
+                return { success: false, error: "You must be logged in to take this exam." };
             }
             const studentEmail = session.email.toLowerCase().trim();
             if (!exam.whitelistEmails.includes(studentEmail)) {

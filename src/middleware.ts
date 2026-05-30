@@ -19,6 +19,14 @@ export default auth((req) => {
 
   // 3. Redirect authenticated users away from auth pages
   if (isAuthPage && isLoggedIn) {
+    const callbackUrl = req.nextUrl.searchParams.get("callbackUrl");
+    if (callbackUrl) {
+      try {
+        return NextResponse.redirect(new URL(callbackUrl, req.url));
+      } catch (e) {
+        console.error("Failed to redirect to callbackUrl:", callbackUrl, e);
+      }
+    }
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 

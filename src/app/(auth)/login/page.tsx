@@ -10,6 +10,7 @@ import { Suspense } from "react";
 function LoginContent() {
     const searchParams = useSearchParams();
     const sessionExpired = searchParams.get("session_expired") === "true";
+    const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
     
     // Clear any stale OAuth cookies before signing in
     const handleSignIn = () => {
@@ -24,7 +25,7 @@ function LoginContent() {
         });
         
         // Now proceed with sign-in
-        signIn("google", { callbackUrl: "/dashboard" });
+        signIn("google", { callbackUrl });
     };
     
     return (
