@@ -112,6 +112,21 @@ export async function startExamAction(examId: string, studentName: string, rollN
         // Check if there is an authenticated user session to link
         const studentId = session?.userId || null;
 
+        // If the user's current role in the database is TEACHER (the default role for new signups),
+        // but they are starting an exam that they did not author, update their role to STUDENT
+        // so that they are correctly routed to the student workspace upon visiting /dashboard.
+        if (session && session.role === "TEACHER" && exam.teacherId !== session.userId) {
+            try {
+                await prisma.user.update({
+                    where: { id: session.userId },
+                    data: { role: "STUDENT" },
+                });
+                session.role = "STUDENT";
+            } catch (roleError) {
+                console.error("Failed to update user role to STUDENT:", roleError);
+            }
+        }
+
         // 6. Create attempt WITHOUT starting timer (timer starts on first fullscreen entry)
         // NOTE: Using createdAt as placeholder until migration makes startedAt nullable
         const attempt = await prisma.studentAttempt.create({

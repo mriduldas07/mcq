@@ -39,8 +39,15 @@ export default async function DashboardPage() {
     const session = await verifySession();
     if (!session) return redirect("/login");
 
+    // Fetch the user from the database to check their role so it correctly handles the redirect
+    // even if the session cookie's role update has cached in the browser.
+    const dbUser = await prisma.user.findUnique({
+        where: { id: session.userId },
+        select: { role: true }
+    });
+
     // Redirect students to student dashboard
-    if (session.role === "STUDENT") {
+    if (dbUser?.role === "STUDENT") {
         return redirect("/dashboard/student");
     }
 

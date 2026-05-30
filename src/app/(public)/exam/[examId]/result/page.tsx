@@ -4,6 +4,7 @@ import { CheckCircle2, XCircle, Circle, Award } from "lucide-react";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
+import { verifySession } from "@/lib/session";
 
 export default async function ResultPage({
     params,
@@ -14,6 +15,7 @@ export default async function ResultPage({
 }) {
     const { examId } = await params;
     const { attemptId } = await searchParams;
+    const session = await verifySession();
 
     // TASK 2: Fetch attempt to show student their result
     if (!attemptId) {
@@ -235,9 +237,9 @@ export default async function ResultPage({
                         )}
                     </div>
 
-                    <Link href="/">
-                        <Button className="w-full">
-                            Return to Home
+                    <Link href={session ? "/dashboard" : "/"}>
+                        <Button className="w-full h-11 sm:h-12 text-sm sm:text-base font-semibold shadow-md hover:shadow-lg transition-all hover:scale-[1.01] active:scale-[0.99] duration-300">
+                            {session ? "Go to Dashboard" : "Return to Home"}
                         </Button>
                     </Link>
                 </CardContent>
